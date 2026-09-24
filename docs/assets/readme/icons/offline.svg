@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="48" height="48"><style>.p{animation:p 1.6s ease-in-out infinite}.spin{transform-origin:center;transform-box:fill-box;animation:s 1.4s linear infinite}
+.ring{transform-origin:24px 6px;animation:r 1.6s ease-in-out infinite}.look{animation:l 3s ease-in-out infinite}
+@keyframes p{50%{opacity:.35}}@keyframes s{to{transform:rotate(360deg)}}@keyframes r{0%,60%,100%{transform:rotate(0)}70%{transform:rotate(14deg)}80%{transform:rotate(-12deg)}90%{transform:rotate(6deg)}}
+@keyframes l{0%,100%{transform:translateX(0)}30%{transform:translateX(-5px)}60%{transform:translateX(5px)}}
+@media (prefers-reduced-motion:reduce){*{animation:none!important}}</style><path d="M8,20 q16,-14 32,0 M14,27 q10,-9 20,0 M20,33 q4,-4 8,0" stroke="#F5C451" stroke-width="3.5" fill="none" stroke-linecap="round"/><circle cx="24" cy="39" r="3" fill="#F5C451"/><path class="p" d="M8,8 L40,40" stroke="#FF5FA2" stroke-width="4" stroke-linecap="round"/></svg>

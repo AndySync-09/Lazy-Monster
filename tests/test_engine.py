@@ -1818,3 +1818,30 @@ def test_monster_wont_close_itself():
     from lazymonster.npu_brain import normalize
     assert is_self_name("Lazy-Monster") and is_self_name("yourself") and not is_self_name("notepad")
     assert normalize({"tool": "close_app", "args": {"app": "everything"}})["tool"] == "hand_off"
+
+
+# ---- 1.7.0: Brain-Break -------------------------------------------------------------------------
+def test_brain_break_needs_two_misses_and_comes_back():
+    from lazymonster.brainbreak import BrainBreak
+    states, net = [], [False, False, False, True]
+    bb = BrainBreak(states.append, check=lambda: net.pop(0))
+    bb.tick(); assert states == [] and not bb.offline           # one miss is not an outage
+    bb.tick(); assert states == [True] and bb.offline
+    bb.tick(); bb.tick(); assert states == [True, False] and not bb.offline
+
+
+def test_offline_simple_things_work_and_big_ones_wait():
+    from lazymonster.brainbreak import BrainBreak
+    from lazymonster.intents import validate
+    eng, ex, client, said, fb = make_agent([])
+    agent = eng.worker.agent
+    bb = BrainBreak(lambda on: None, check=lambda: False); bb.tick(); bb.tick()
+    agent.brain_break = bb
+    class Q:
+        def handle(self, task):
+            return (validate("open_app", {"app": "Notepad"}, source="agent"), "Opening Notepad.", 0.3) if "notepad" in task else None
+    agent.quick = Q()
+    agent.run("open notepad")
+    assert said[-1] == "Opening Notepad." and client.seen == []
+    agent.run("research the latest nvidia news")
+    assert "Brain-Break" in said[-1] and bb.waiting == ["research the latest nvidia news"] and client.seen == []

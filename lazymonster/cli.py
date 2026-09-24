@@ -86,6 +86,7 @@ def _build(cfg: Config, dry_run: bool, logger=None, feedback=None, clock=time.mo
         ag.jev = getattr(engine, "jev", None)
         from . import npu_brain
         ag.quick = npu_brain._quick
+        ag.brain_break = getattr(engine, "brain_break", None)
         return ag
     engine.brain = BrainControl(cfg, engine, make_agent_live)
     engine.on_brain = engine.brain.handle
@@ -310,6 +311,8 @@ def status_event(cfg, agent_enabled: bool, info: dict, voice: str) -> dict:
         short += " + Jev"
     if info.get("quick") and short:
         short += " + quick " + str(info["quick"])
+    if info.get("break"):
+        short = "Brain-Break \u00b7 on-PC brain"
     return {"type": "status", "wake_dev": dev or "ears",
             "wake_title": f"{wake}. {info.get('stt', '')}." + (f" Push-to-talk: {info['ptt']}." if info.get("ptt") else ""),
             "brain": short if agent_enabled else "", "big": bool(cfg.go_big and agent_enabled),
@@ -507,6 +510,35 @@ def cmd_ui(a, cfg):
                 else:
                     status("quick brain: off (not downloaded, or the NPU refused it; run: monster bench-brain)")
             threading.Thread(target=load_quick, daemon=True).start()
+        from .brainbreak import BrainBreak
+
+        def on_net(offline: bool):
+            info["break"] = offline
+            bus.emit({"type": "brainbreak", "on": offline})
+            refresh_status()
+            ag = engine.worker.agent
+            if offline:
+                if ag is not None and ag.quick is None and cfg.quick_brain_model:
+                    from . import npu_brain                     # borrow the on-PC brain for the break
+                    ag.quick = npu_brain.load(type("C", (), {**{k: getattr(cfg, k) for k in vars(cfg)},
+                                                             "quick_brain": True})())
+                engine.log(event="brain_break", on=True)
+                conv.announce("No internet. Brain-Break: I'm running on my own brain now. Simple things still work.")
+            else:
+                engine.log(event="brain_break", on=False)
+                waiting = bb.waiting[:]
+                bb.waiting.clear()
+                if waiting and ag is not None:
+                    ag.seed(f"We're back online. Earlier you asked: {waiting[-1]}. Want me to do that now?")
+                    conv.announce(f"We're back online. Earlier you asked: {waiting[-1]}. Want me to do that now?",
+                                  listen=True)
+                else:
+                    conv.announce("We're back online. Full brain again.")
+        bb = BrainBreak(on_net)
+        engine.brain_break = bb
+        if engine.worker.agent is not None:
+            engine.worker.agent.brain_break = bb
+        bb.run(stop)
         if os.environ.get("LM_RESTARTED"):
             bus.emit({"type": "note", "text": "I restarted after a crash. Report: " + os.environ["LM_RESTARTED"]})
 

@@ -209,6 +209,20 @@ class Conversation:
         if phrase:
             threading.Thread(target=self.speaker.say, args=(phrase,), daemon=True).start()
 
+    def announce(self, text: str, listen: bool = False) -> None:
+        """Say something unprompted (Brain-Break on/off), without stepping on a task in progress."""
+        def go():
+            for _ in range(60):
+                if not self.task_active and not self.speaker.speaking:
+                    break
+                time.sleep(0.5)
+            self.emit({"type": "say", "text": text})
+            self.speaker.say(text)
+            if listen:
+                self.engine.armed_until = self.clock() + 30
+                self.engine.armed_source = "followup"
+        threading.Thread(target=go, daemon=True).start()
+
     # ---- reminders that come to you -----------------------------------------------------------
     def remind(self, r: dict, late: bool = False) -> None:
         """A reminder is due: wake up, say it, suggest what to do next, and wait for your pick.

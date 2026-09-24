@@ -200,6 +200,7 @@ class Agent:
         self.approved = {}                        # (tool, project) -> time: say yes once per project per session
         self.jev = None                           # optional decider (jev.py): routing, difficulty, yes/no
         self.quick = None                         # optional quick brain on the NPU (npu_brain.py)
+        self.brain_break = None                   # BrainBreak: offline -> on-PC brain only
 
     def _system(self) -> str:
         if not self.journal:
@@ -376,6 +377,12 @@ class Agent:
         self.log(event="approval", intent=intent.name, ok=ok, text=ans or "")
         return ok, ("the user said yes" if ok else f"the user did not approve ({ans or 'no answer'}); do not retry")
 
+    def _brain_is_local(self) -> bool:
+        """A main brain on this PC or network (Ollama, llama.cpp, vLLM) keeps working offline."""
+        url = getattr(self.client, "base_url", "") or ""
+        return type(self.client).__name__ == "LocalClient" and any(
+            h in url for h in ("localhost", "127.0.0.1", "192.168.", "10.", "172.16.", ".local"))
+
     def _quick_path(self, task: str) -> bool:
         """Simple one-step requests: the NPU model picks the tool; anything else goes to the main brain."""
         from .npu_brain import looks_simple
@@ -411,9 +418,16 @@ class Agent:
         return True
 
     def run(self, task: str) -> bool:
-        if self.quick is not None and getattr(getattr(self, "cfg", None), "quick_brain", False):
+        bb = self.brain_break
+        offline = bool(bb and bb.offline)
+        if self.quick is not None and (offline or getattr(getattr(self, "cfg", None), "quick_brain", False)):
             if self._quick_path(task):
                 return True
+        if offline and not self._brain_is_local():
+            bb.waiting = (bb.waiting + [task])[-5:]
+            self.log(event="brain_break_wait", text=task[:80])
+            self.say("That one needs the internet, and we're on a Brain-Break. I'll offer it again when we're back online.")
+            return True
         self.cancel.clear()
         results = []
         client = self.client

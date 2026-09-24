@@ -5,3 +5,4 @@
 *.ttf binary
 *.onnx binary
 *.npz binary
+*.mp4 binary

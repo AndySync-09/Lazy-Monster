@@ -10,168 +10,159 @@
 <h3 align="center">Say it. The monster does it.</h3>
 
 <p align="center">
-  A local-first voice agent for Windows that opens apps, writes documents and handles the busywork,<br>
-  so you can stay exactly as lazy as you deserve to be.
+  A voice agent that lives on your Windows AI PC. It hears you on the NPU, thinks on the GPU,<br>
+  talks on the CPU, drives your real apps, and keeps working when the Wi-Fi dies.
 </p>
 
 <p align="center">
-  <a href="LICENSE"><img alt="License" src="https://img.shields.io/badge/license-Apache%202.0-7C5CFF?style=flat-square"></a>
-  <img alt="Platform" src="https://img.shields.io/badge/platform-Windows%2010%20%7C%2011-7C5CFF?style=flat-square">
-  <img alt="Python" src="https://img.shields.io/badge/python-3.11%2B-7C5CFF?style=flat-square">
-  <img alt="Status" src="https://img.shields.io/badge/status-early%20preview-C6F432?style=flat-square&labelColor=0D1117">
+  <a href="LICENSE"><img alt="License" src="https://img.shields.io/badge/license-Apache%202.0-7C5CFF?style=for-the-badge&labelColor=0D0A1F"></a>
+  <img alt="Windows 10 and 11" src="https://img.shields.io/badge/windows-10%20%7C%2011-9DB8FF?style=for-the-badge&labelColor=0D0A1F">
+  <img alt="Intel AI PC" src="https://img.shields.io/badge/NPU%20%2B%20GPU%20%2B%20CPU-hybrid-C6F432?style=for-the-badge&labelColor=0D0A1F">
+  <img alt="Works offline" src="https://img.shields.io/badge/offline-Brain--Break-F5C451?style=for-the-badge&labelColor=0D0A1F">
+  <img alt="No telemetry" src="https://img.shields.io/badge/telemetry-none-FF5FA2?style=for-the-badge&labelColor=0D0A1F">
 </p>
+
+<p align="center">
+  <a href="#install"><b>Install in one line</b></a> &nbsp;·&nbsp;
+  <a href="#three-engines-one-monster"><b>How it thinks</b></a> &nbsp;·&nbsp;
+  <a href="#brain-break"><b>Brain-Break</b></a> &nbsp;·&nbsp;
+  <a href="#models-that-ship"><b>Models</b></a> &nbsp;·&nbsp;
+  <a href="https://andysync-09.github.io/lazy-monster/"><b>Website</b></a>
+</p>
+
+<!-- Demo video: drag docs/media/lazy-monster-16x9.mp4 into this README in GitHub's editor and paste the
+     https://github.com/user-attachments/... link it gives you on the line below; GitHub then plays it inline. -->
 
 ---
 
-## What it does
+## You say "Hey Monster". Then:
 
 <table>
 <tr>
-<td width="50%" valign="top">
-<img src="docs/assets/icons/bolt.svg" width="22" align="left">&nbsp;<b>Instant commands</b><br>
-"Hey Monster, mute." Volume, media, windows, apps and settings run on-device in milliseconds, often before you finish the sentence. No network, no cost.
-</td>
-<td width="50%" valign="top">
-<img src="docs/assets/icons/sparkle.svg" width="22" align="left">&nbsp;<b>Real work, not just chat</b><br>
-"Hey Monster, open VS Code and write a snake game in Python." The agent drives real apps step by step while you watch: Word, VS Code, your browser and more.
-</td>
+<td width="50%" valign="top"><img src="docs/assets/readme/icons/bolt.svg" width="36" align="left">&nbsp;<b>Simple stuff in 0.3 s, on your PC</b><br>
+"Open Spotify." "Volume 40." "Remind me in 20 minutes to stretch." A small model on your GPU picks the action in about 0.3 seconds. No cloud, no cost, no waiting.</td>
+<td width="50%" valign="top"><img src="docs/assets/readme/icons/wave.svg" width="36" align="left">&nbsp;<b>Real work in real apps</b><br>
+"Open VS Code and write a snake game." "Make three slides about Meta AI." "Write my cover letter in Word and save it." It drives the actual apps, step by step, while you watch.</td>
 </tr>
 <tr>
-<td valign="top">
-<img src="docs/assets/icons/speaker.svg" width="22" align="left">&nbsp;<b>Talks back, locally</b><br>
-A natural open-source voice (Kokoro) that says what it did, offers the next step, and asks when it is unsure.
-</td>
-<td valign="top">
-<img src="docs/assets/icons/shield.svg" width="22" align="left">&nbsp;<b>Safe by construction</b><br>
-The model proposes and Lazy-Monster checks. There is no shell tool, no delete and no send. Files stay in a sandbox folder, and risky steps wait for your "yes".
-</td>
+<td valign="top"><img src="docs/assets/readme/icons/offline.svg" width="36" align="left">&nbsp;<b>Brain-Break: works offline</b><br>
+Wi-Fi gone? It says so, switches to its on-PC brain and keeps going. Anything that truly needs the internet waits, and it offers it again when you're back.</td>
+<td valign="top"><img src="docs/assets/readme/icons/eye.svg" width="36" align="left">&nbsp;<b>Sees your screen, when you ask</b><br>
+"Explain this error." It reads the window, and reads text out of screenshots on the NPU. Screenshots never leave your PC unless you allow it.</td>
 </tr>
 <tr>
-<td valign="top">
-<img src="docs/assets/icons/chip.svg" width="22" align="left">&nbsp;<b>Local-first, NPU ready</b><br>
-Wake word, speech recognition and instant commands never leave your PC. OpenVINO detects the Intel NPU so on-device models can run there. Only open-ended tasks reach a cloud model.
-</td>
-<td valign="top">
-<img src="docs/assets/icons/plug.svg" width="22" align="left">&nbsp;<b>Bring your own brain</b><br>
-OpenAI today. Any OpenAI-compatible endpoint works, and more providers plug in behind one typed interface.
-</td>
+<td valign="top"><img src="docs/assets/readme/icons/bell.svg" width="36" align="left">&nbsp;<b>Comes to you</b><br>
+"Remind me about the cafe meeting at 8 AM." At 8 it wakes up, tells you, and suggests what to do next: open the project, update the code, draft the email. It always asks first.</td>
+<td valign="top"><img src="docs/assets/readme/icons/lock.svg" width="36" align="left">&nbsp;<b>Only your voice</b><br>
+Voice lock ignores the TV and the room. Talk over it to interrupt; its own voice can't. Push-to-talk from anywhere: <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>Space</kbd>.</td>
 </tr>
 </table>
 
-## How it works
+## Three engines, one monster
 
-```mermaid
-flowchart LR
-    MIC([Microphone]) --> STT[On-device streaming<br>speech recognition]
-    STT --> WAKE{"Hey Monster"}
-    WAKE --> G[Instant grammar<br>&lt;0.02 ms]
-    G -- match --> W[Agent worker]
-    G -- no match --> P[Agent loop<br>cloud model]
-    P --> V[Local validation<br>and guards]
-    V -- risky --> C{Your 'yes'}
-    V -- safe --> W
-    C --> W
-    W --> APPS[Windows, Word,<br>VS Code, browser]
-    APPS -- what's on screen --> P
+<p align="center"><img src="docs/assets/readme/arch.svg" width="100%" alt="Architecture: mic, wake word on the NPU, speech on the GPU, a router to the quick brain on the GPU or the main brain, actions, and the voice on the CPU"></p>
+
+An Intel AI PC has three different processors. Lazy-Monster gives each one the job it's best at, so the always-on parts sip power and the fast parts are fast. Measured on a Core Ultra 9 185H laptop:
+
+| | Engine | Job | Measured |
+|---|---|---|---|
+| <img src="docs/assets/readme/icons/npu.svg" width="28"> | **NPU** | "Hey Monster" wake word, always listening | about 2% NPU load |
+| <img src="docs/assets/readme/icons/npu.svg" width="28"> | **NPU** | Reading text in screenshots (OCR) | 1.4 s per screen |
+| <img src="docs/assets/readme/icons/gpu.svg" width="28"> | **GPU** | Hearing what you said (Whisper) | 3 s of speech in 0.73 s |
+| <img src="docs/assets/readme/icons/gpu.svg" width="28"> | **GPU** | Quick brain: picking the action for simple requests | 0.3 s, 12 of 12 right |
+| <img src="docs/assets/readme/icons/cpu.svg" width="28"> | **CPU** | The monster's voice, voice lock, streaming captions | voice ready in 1.1 s |
+
+Every placement came from a benchmark on the machine, not a guess. The NPU ran the same quick-brain model at 3.3 s, the GPU at 0.3 s, so the quick brain lives on the GPU. Run the benchmarks on yours:
+
+```powershell
+monster bench-brain --device all ; monster bench-vision
 ```
 
-Three lanes, one rule: **every action is a typed tool declared in [`lazymonster/intents.py`](lazymonster/intents.py)**. Anything else is rejected, whoever asked for it.
+### Why an AI PC makes this better
+
+- **Always on without draining the battery.** The wake word runs on the NPU, the low-power processor built for exactly this, so listening for "Hey Monster" all day costs almost nothing.
+- **Fast where it matters.** The GPU turns your speech into text and picks simple actions in fractions of a second, faster than a round trip to any cloud.
+- **Private by design.** Your voice, your screen and your simple requests are handled on the laptop. Only the jobs you'd want a big model for go to the cloud brain you chose, and even that can be a local model.
+- **Nothing fights.** Three engines means the wake word, speech, the quick brain and the voice don't queue behind each other.
+
+## Brain-Break
+
+<img src="docs/assets/readme/icons/offline.svg" width="44" align="right">
+
+When the internet goes away, the monster notices within about 40 seconds (a connection check to well-known addresses; nothing is sent), puts on its headband, and says it's running on its own brain.
+
+| Keeps working | Waits for the internet |
+|---|---|
+| Wake word, speech, voice, voice lock | Web research |
+| Simple actions via the quick brain | Multi-step jobs on a cloud brain |
+| Reminders, PC status, screen reading | |
+| **Everything**, if your main brain is local (Ollama, llama.cpp, vLLM) | |
+
+Anything that waited is offered again when you're back: "We're back online. Earlier you asked for the Nvidia news. Want me to do that now?"
+
+## Models that ship
+
+All open source, all downloaded once, all running on your PC.
+
+| Job | Model | Runs on | License |
+|---|---|---|---|
+| Wake word | Your own "Hey Monster" detector on openWakeWord features | NPU | Apache 2.0 |
+| Streaming captions | Moonshine small | CPU | MIT |
+| Accurate hearing | distil-Whisper large-v3 (INT8, OpenVINO) | GPU | MIT |
+| Quick brain | Qwen2.5 1.5B Instruct (INT4, OpenVINO) | GPU | Apache 2.0 |
+| Voice | Kokoro-82M | CPU | Apache 2.0 |
+| Voice lock | TitaNet-small speaker embeddings | CPU | CC-BY-4.0 |
+| Screen reading | PP-OCRv4 (via RapidOCR, OpenVINO) | NPU | Apache 2.0 |
+| Optional: screen understanding | Qwen2.5-VL 3B (INT4, NPU build) | NPU | Qwen Research License |
+
+The main brain is your choice: OpenAI, Claude, or any local model through Ollama, llama.cpp, vLLM or LM Studio. Change it by voice ("Hey Monster, switch to Claude"), in the settings panel, or with `monster brain`.
 
 ## Install
 
-One command in PowerShell (Windows 10 or 11, no admin rights):
+One command in PowerShell. Windows 10 or 11, no admin rights:
 
 ```powershell
 irm https://raw.githubusercontent.com/AndySync-09/lazy-monster/main/install.ps1 | iex
 ```
 
-First it sets up the brain: **OpenAI**, **Claude**, or a **local model** (Ollama, llama.cpp, vLLM, LM Studio), and checks it works. Optionally it adds **Jev** by TypeSafe, which makes the fast decisions around the brain (was that meant for me, which tool, did you say yes). Then it finds or installs Python, installs Lazy-Monster in its own folder, downloads the voice models, learns your voice, and starts it in the background.
+It asks for a brain (OpenAI, Claude or a local model) and checks it, installs into its own folder, downloads the voice models (about 1.9 GB, once), learns your voice and wake word (about 5 minutes), and starts at sign-in, living in the tray. Prefer to read it first? It's all in [install.ps1](install.ps1). Windows may show a SmartScreen prompt for a script from the internet; that's expected for an open-source tool.
 
-Make it yours (voices, your own speech and voice models, the brain): see [docs/VOICES.md](docs/VOICES.md).
+Update by running the same command. Remove with `uninstall.ps1` in `%LOCALAPPDATA%\LazyMonster\app`.
 
-**Change the brain or model any time:** the gear icon in the window, the tray's Settings…, saying "Hey Monster, switch to Claude", or `monster brain --list` and `monster brain --use <model>`. Run it again to update. Prefer to read it first? See [install.ps1](install.ps1). To remove: `uninstall.ps1` in `%LOCALAPPDATA%\LazyMonster\app`.
+## It won't
 
-macOS is coming next week. Watch the repo (Watch → Custom → Releases) to hear when it ships.
+<img src="docs/assets/readme/icons/shield.svg" width="44" align="right">
 
-Developers: clone the repo and run `powershell -ExecutionPolicy Bypass -File .\setup.ps1` for an editable install.
+- delete files, run shell commands, send email or buy anything. Email is always a draft you send.
+- run code or install packages without you saying yes, once per project.
+- look at your screen unless you ask, or look at windows that look private (passwords, keys, banking).
+- close anything it didn't open, or close itself. "Close everything" means what it opened, and it asks about unsaved work.
+- phone home. No telemetry, no accounts, no ads.
 
-Website: [andysync-09.github.io/lazy-monster](https://andysync-09.github.io/lazy-monster/) (served from `docs/`).
-
-## Local by default
-
-| Part | Model | Runs on |
-|---|---|---|
-| "Hey Monster" wake word | Your personal detector on openWakeWord features | Intel NPU |
-| Instant commands | Moonshine small (streaming, only after the wake word) | CPU |
-| What the agent hears | distil-Whisper large-v3, INT8, via OpenVINO GenAI | Intel NPU (GPU/CPU fallback) |
-| The monster's voice | Kokoro-82M, voice `af_heart` | CPU |
-| The agent's reasoning | gpt-5.4-mini (configurable, any OpenAI-compatible endpoint) | cloud |
-
-Prepare the local models once (about 1.9 GB download, then compiled for your NPU):
-```powershell
-.\.venv\Scripts\monster.exe models
-```
-
-Train your personal "Hey Monster" wake word (about 3 minutes, runs on the NPU afterwards):
-```powershell
-.\.venv\Scripts\monster.exe wake-train
-```
-
-## Make it yours
-
-Lock it to your voice (read five sentences):
-```powershell
-.\.venv\Scripts\monster.exe voice-enroll
-```
-Push-to-talk from anywhere: **Ctrl+Alt+Space**. "Hey Monster, sleep" shrinks it to a small orb that keeps listening.
-
-## Run it in the background
-
-Start Lazy-Monster at sign-in, hidden until you say "Hey Monster":
-```powershell
-.\.venv\Scripts\monster.exe service install
-```
-Check it, or stop it:
-```powershell
-.\.venv\Scripts\monster.exe service status
-```
-```powershell
-.\.venv\Scripts\monster.exe service uninstall
-```
+Details: [SECURITY.md](SECURITY.md).
 
 ## Commands
 
 | Command | What it does |
 |---|---|
-| `monster` (or `monster ui`) | The Lazy-Monster window: particle monster, transcript, steps, text box |
-| `monster run [-v] [--dry-run]` | Headless: listen on the microphone in the terminal |
-| `monster models` | Download and prepare the local speech and voice models |
-| `monster wake-train` | Train your personal "Hey Monster" wake word |
-| `monster text [--execute]` | Type requests instead of speaking |
-| `monster do <task>` | Run one task with the agent and watch each step (`--dry-run` to simulate) |
-| `monster npu` | Detect and benchmark the NPU, GPU and CPU via OpenVINO |
-| `monster doctor` | Check the environment, microphone, key and Word |
-| `monster apps` | List every app the monster can open |
-| `monster record <dir>` then `monster bench-audio <dir>` | Measure accuracy and time-to-action on your own voice |
+| `monster` | The window: mascot, captions, the steps it takes |
+| `monster doctor` | Check everything, with the fix for anything wrong |
+| `monster brain --list` / `--use <model>` / `--big on` / `--quick on` | See and change the brain |
+| `monster bench-brain --device all` | Benchmark the quick brain on NPU and GPU, keep the best |
+| `monster bench-vision` | Benchmark screen reading and screen understanding |
+| `monster voice-reset --train` | Retrain your wake word and voice lock from scratch |
+| `monster voices` | Hear and pick the monster's voice |
+| `monster service status` / `start` / `stop` | The background monster (restarts itself after a crash) |
+| `monster crashes` | The latest crash report, if there ever is one |
 
-## Things you can say
+## The fun part
 
-| Instant (local) | Agent (planner) |
-|---|---|
-| "Hey Monster, set volume to 30" | "Hey Monster, open Word and write a cover letter for a design job and save it" |
-| "Hey Monster, next song" | "Hey Monster, write a packing list for Bangkok and save it as a text file" |
-| "Hey Monster, open Bluetooth settings" | "Hey Monster, draft a birthday poem for my sister in Word" |
-| "Hey Monster, lock the computer" | "Hey Monster, open VS Code and write a snake game in Python" |
-| "Hey Monster, stop" (cancels a running task), "Hey Monster, sleep" (exits) | "Hey Monster, open Notepad and write my grocery list" |
-
-## Roadmap
-
-See [docs/SPEC.md](docs/SPEC.md). In short: floating orb UI, realtime conversational voice, accent adaptation, a one-click installer, then Excel and PowerPoint.
+It's a monster. It sleeps, snores little Zs, yawns, stretches and peeks at you. Its eyes follow your pointer. When it works, it dissolves into a particle monster that thinks in branches and types in the air, then snaps back and hops. It wears Diwali lights in October, a winter hat in December and a cricket cap in IPL season. You can make it walk along your taskbar while it naps. None of this is necessary. All of it is on purpose.
 
 ## Contributing
 
-Pull requests are welcome. Read [CONTRIBUTING.md](CONTRIBUTING.md) first. Every new ability must be a typed tool with tests, and nothing may weaken the safety rules in [SECURITY.md](SECURITY.md).
+Pull requests welcome. Every new ability is a typed tool with tests, and nothing may weaken the rules in [SECURITY.md](SECURITY.md). Start with [CONTRIBUTING.md](CONTRIBUTING.md) and the `good first issue` label.
 
 ## License
 
-[Apache 2.0](LICENSE). The monster is lazy, not proprietary.
+[Apache 2.0](LICENSE). The monster is lazy, not proprietary. Bundled models keep their own licenses (table above).

@@ -71,6 +71,9 @@
  .acc-coffee .steam{animation:steam 2s ease-in-out infinite}
  @keyframes twinkle{50%{opacity:.35}}
  @keyframes steam{0%{opacity:0;transform:translateY(4px)}50%{opacity:.8}100%{opacity:0;transform:translateY(-10px)}}
+ /* Brain-Break: headband on, working on its own brain */
+ #mascot.brainbreak .acc-band{display:inline}
+ #mascot.brainbreak .acc-band .spark{animation:twinkle 1s ease-in-out infinite}
  /* idle moments */
  #mascot.yawn .mouth{transform:scale(1.6,2.3)}#mascot.yawn .body{animation:stretch 1.8s ease-in-out}
  #mascot.stretch .body{animation:stretch 1.8s ease-in-out}#mascot.stretch .hornL{transform:rotate(-4deg)}#mascot.stretch .hornR{transform:rotate(4deg)}
@@ -118,6 +121,8 @@
   <circle cx="118" cy="110" r="10" fill="#FFB36B"/><circle cx="148" cy="98" r="10" fill="#C6F432"/><circle cx="180" cy="90" r="10" fill="#FF5FA2"/>
   <circle cx="212" cy="89" r="10" fill="#FFE66D"/><circle cx="244" cy="95" r="10" fill="#9DB8FF"/><circle cx="276" cy="106" r="10" fill="#FFB36B"/>
   <path d="M40,272 q14,-18 28,0 z" fill="#FFB36B"/><path d="M54,254 q-5,-10 0,-16 q5,6 0,16" fill="#FFE66D"/></g>
+ <g class="acc acc-band"><path d="M92,128 Q200,78 308,128 L304,146 Q200,98 96,146 Z" fill="#F5C451"/><path d="M96,146 Q200,98 304,146" stroke="#16142B" stroke-width="3" fill="none" opacity=".35"/>
+  <path class="spark" d="M200,94 l6,10 l-10,-2 l10,-4 l-4,10 z" fill="#16142B"/></g>
  <g class="acc acc-coffee"><rect x="306" y="226" width="40" height="42" rx="8" fill="#F3F1FF"/><path d="M346,236 q14,2 0,20" stroke="#F3F1FF" stroke-width="6" fill="none"/>
   <rect x="306" y="226" width="40" height="10" rx="4" fill="#7C5CFF"/><path class="steam" d="M318,214 q-6,-10 2,-18 M332,214 q-6,-10 2,-18" stroke="#CFC9F2" stroke-width="4" fill="none" stroke-linecap="round"/></g>
  <g class="acc acc-mask"><rect x="120" y="150" width="160" height="44" rx="22" fill="#16142B"/><path d="M140,172 q18,10 36,0 M224,172 q18,10 36,0" stroke="#CFC9F2" stroke-width="5" fill="none" stroke-linecap="round"/>

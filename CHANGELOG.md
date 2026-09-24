@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.7.0: Brain-Break
+- **Brain-Break: it keeps working offline.** A light connection check every 20 seconds (nothing is sent). After two misses the monster puts on its headband, the status bar turns yellow and says "Brain-Break · on-PC brain", and it tells you. Simple requests go to the quick brain on your PC (even if the quick brain is normally off, it's borrowed for the break). If your main brain is local (Ollama, llama.cpp, vLLM on this PC or your network) everything keeps working. Anything that needs the internet is kept, and when the connection is back it offers the last one again.
+- **Minimise button on the sleeping orb.** Hover the orb for a small button that sends it to the tray; "Hey Monster" or Ctrl+Alt+Space brings it back.
+- **New README.** A developer write-up: the NPU/GPU/CPU split with measured numbers, Brain-Break, every model that ships with its license, why an AI PC makes this better, an animated architecture diagram, and animated icons.
+
 ## 1.6.3
 - **Fix: "close everything" closed the monster too.** "Close everything", "close all windows" and "close it all" now always mean the careful close: only what the monster opened, asking about unsaved work. On top of that the monster can't close itself any more: its own window is never recorded as something it opened, "close" can't target it (by name or process), close keys aren't pressed while its window is in front, and closing its window (Alt+F4 or any other way) just hides it. Only Quit in the tray ends it.
 - The quick brain hands "close everything" to the main brain instead of guessing an app called "everything".
