@@ -94,6 +94,7 @@ class Tray:
             pystray.MenuItem("Settings…", lambda icon, item: (show_window(icon, item),
                                                                self.bus.emit({"type": "open_settings"}))),
             pystray.MenuItem("Hide window", hide_window),
+            pystray.MenuItem("Back to the corner", lambda icon, item: self.bus.back_to_corner()),
             pystray.MenuItem("Pause listening", toggle_pause, checked=lambda item: self.paused),
             pystray.MenuItem("Stop talking", lambda icon, item: self.speaker.interrupt()),
             pystray.MenuItem("Voice lock (only my voice)", toggle_lock,

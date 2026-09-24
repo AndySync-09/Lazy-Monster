@@ -35,6 +35,31 @@ class UIBus:
         self._save_t.daemon = True
         self._save_t.start()
 
+    def unmaximize(self) -> None:
+        """Windows: the monster is a small corner window, never full screen."""
+        import os
+        if os.name != "nt" or self.window is None or not self.geom:
+            return
+        try:
+            import win32con
+            import win32gui
+            hwnd = _hwnd(self.window)
+            if hwnd and win32gui.IsZoomed(hwnd):
+                win32gui.ShowWindow(hwnd, win32con.SW_RESTORE)
+                self.back_to_corner()
+        except Exception:
+            pass
+
+    def back_to_corner(self) -> None:
+        if self.window is None or not self.geom:
+            return
+        x, y, w, h = self.geom["orb" if self.orb else "full"]
+        try:
+            self.window.resize(w, h)
+            self.window.move(x, y)
+        except Exception:
+            pass
+
     def move_to(self, side: str):
         """"Hey Monster, move to the right"."""
         if not self.geom or self.window is None:
@@ -267,6 +292,11 @@ def tool_window(win, log=print) -> bool:
         if not hwnd:
             return False
         monster_icon(hwnd)
+        # no maximise: double-clicking the title strip made it fill the screen
+        st = win32gui.GetWindowLong(hwnd, win32con.GWL_STYLE)
+        st2 = st & ~(win32con.WS_MAXIMIZEBOX | win32con.WS_THICKFRAME)
+        if st2 != st:
+            win32gui.SetWindowLong(hwnd, win32con.GWL_STYLE, st2)
         ex = win32gui.GetWindowLong(hwnd, win32con.GWL_EXSTYLE)
         want = (ex | win32con.WS_EX_TOOLWINDOW) & ~win32con.WS_EX_APPWINDOW
         if want != ex:
@@ -310,6 +340,9 @@ def run_window(bus: UIBus, api: Api, backend, stop: threading.Event, hidden: boo
             if tool_window(win, log=lambda m: None):
                 break
             _t.sleep(0.5)
+        while not stop.is_set():                       # if anything still maximises it, put it back
+            _t.sleep(1.5)
+            bus.unmaximize()
     threading.Thread(target=keep_style, daemon=True).start()
 
     def main():

@@ -157,6 +157,7 @@ const api=()=>window.pywebview&&window.pywebview.api;
 function send(t){t=(t||'').trim();if(!t)return;$('inp').value='';api()&&api().submit(t);}
 $('go').onclick=()=>send($('inp').value);$('inp').onkeydown=e=>{if(e.key==='Enter')send($('inp').value);};
 $('close').onclick=()=>api()&&api().hide();
+document.getElementById('top').addEventListener('dblclick',e=>{e.preventDefault();e.stopPropagation();});
 cv.onclick=()=>{if(!api())return;if(st==='speak')api().stop_talking();else api().talk();};cv.title='Click to talk (or stop it talking)';
 $('mini').onclick=()=>{document.body.classList.toggle('mini');api()&&api().compact(document.body.classList.contains('mini'));};
 window.lm={event(ev){switch(ev.type){

@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.3.2
+- Fix: the window could go full screen (double-clicking its title strip maximised it). It can no longer be maximised, and if anything does, it snaps back to its corner size within a second or two. Tray: "Back to the corner".
+
 ## 1.3.1
 - **Fix: your voice was swapped for the Windows voice.** 1.3.0 used numpy in the Kokoro voice without importing it, so every sentence failed and quietly fell back to Windows' own voice; changing the voice in settings did nothing because Kokoro wasn't speaking at all. Fixed, and a fallback now shows a note in the window (and the Windows fallback prefers a female voice).
 - Changing the voice in settings says a sentence in the new voice right away; a preview no longer leaves the preview voice behind.

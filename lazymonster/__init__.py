@@ -1,2 +1,2 @@
 """Lazy-Monster: say it, the monster does it. Local-first voice agent for Windows."""
-__version__ = "1.3.1"
+__version__ = "1.3.2"
