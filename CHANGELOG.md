@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.3.1
+- **Fix: your voice was swapped for the Windows voice.** 1.3.0 used numpy in the Kokoro voice without importing it, so every sentence failed and quietly fell back to Windows' own voice; changing the voice in settings did nothing because Kokoro wasn't speaking at all. Fixed, and a fallback now shows a note in the window (and the Windows fallback prefers a female voice).
+- Changing the voice in settings says a sentence in the new voice right away; a preview no longer leaves the preview voice behind.
+
 ## 1.3.0: reminders that come to you
 - **Reminders.** "Hey Monster, remind me about the cafe website meeting at 8 AM" (also "in 20 minutes", "tomorrow morning", "tonight at 7"). At that time the monster wakes up by itself, pops up, sends a tray notification, says it, and suggests up to three things it could do next from your recent work (open the project, update the code, draft an email). It waits for your pick ("the last one") and does nothing until you choose; if you're away (brushing your teeth), it checks once more five minutes later. "What are my reminders", "cancel the cafe reminder", "snooze for 10 minutes". A reminder missed while the PC was off still fires up to 3 hours late.
 - **Email drafts.** `draft_email` opens a filled-in draft in your mail app. You review and send; the monster never sends.

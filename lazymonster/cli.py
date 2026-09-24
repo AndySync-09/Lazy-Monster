@@ -458,6 +458,7 @@ def cmd_ui(a, cfg):
         api._ctl = SettingsCtl(cfg, engine, conv, speaker, bus, det_ref,
                                {"lock": info.get("lock_obj"), "verify": engine.verify}, refresh_status)
         engine.brain.on_change = refresh_status
+        speaker.on_fallback = lambda why: bus.emit({"type": "note", "text": f"Kokoro voice failed ({why}); using the Windows voice"})
 
         def on_remind(r):
             bus.set_orb(False)

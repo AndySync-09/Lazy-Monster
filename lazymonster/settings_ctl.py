@@ -54,10 +54,13 @@ class SettingsCtl:
                 msg = "Local address saved. Pick Local to use it."
         elif key == "voice":
             c.kokoro_voice = str(value)
-            if getattr(self.speaker, "kokoro", None) is not None:
-                self.speaker.kokoro.voice = c.kokoro_voice
             save_setting("kokoro_voice", c.kokoro_voice)
-            msg = "Voice changed."
+            if getattr(self.speaker, "kokoro", None) is None:
+                msg = "Saved. The Kokoro voices didn't load in this session; restart the monster to use it."
+            else:
+                self.speaker.kokoro.voice = c.kokoro_voice
+                threading.Thread(target=self.speaker.say, args=("Okay, this is my voice now.",), daemon=True).start()
+                msg = "Voice changed."
         elif key == "wake_sensitivity":
             c.wake_sensitivity = round(float(value), 2)
             save_setting("wake_sensitivity", c.wake_sensitivity)
@@ -118,7 +121,7 @@ class SettingsCtl:
             try:
                 self.speaker.say("Hi, this is how I sound. Say hey monster whenever you need me.")
             finally:
-                k.voice = self.cfg.kokoro_voice if self.cfg.kokoro_voice != voice else voice
+                k.voice = self.cfg.kokoro_voice                # back to the voice you picked
         threading.Thread(target=run, daemon=True).start()
         return "Playing."
 

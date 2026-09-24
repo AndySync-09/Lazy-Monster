@@ -8,6 +8,8 @@ import threading
 import time
 from typing import Callable, Optional
 
+import numpy as np
+
 
 def _clean(text: str) -> str:
     text = re.sub(r"[`*_#>]+", "", text)                 # no markdown read aloud
@@ -101,6 +103,7 @@ class Speaker:
         self._sapi = None
         self.kokoro = None
         self.speaking = False
+        self.on_fallback: Callable[[str], None] = lambda why: None
 
     def say(self, text: str) -> None:
         text = _clean(text)
@@ -117,7 +120,12 @@ class Speaker:
                         self.kokoro.speak(text)
                         return
                     except Exception as e:
-                        print(f"  (voice: Kokoro failed, using Windows voice: {str(e)[:80]})", flush=True)
+                        # say it once, loudly: a silent fallback is how 1.3.0 swapped your voice for Windows'
+                        if not getattr(self, "_told_fallback", False):
+                            self._told_fallback = True
+                            print(f"  (voice: Kokoro failed, using the Windows voice: {type(e).__name__}: {str(e)[:80]})",
+                                  flush=True)
+                            self.on_fallback(f"{type(e).__name__}: {str(e)[:80]}")
                 if self.backend == "openai" and self.key:
                     try:
                         self._openai(text)
@@ -167,6 +175,13 @@ class Speaker:
                 pass
             import win32com.client
             self._sapi = win32com.client.Dispatch("SAPI.SpVoice")
+            try:                                              # keep it a female voice, like the default
+                for v in self._sapi.GetVoices():
+                    if "zira" in v.GetDescription().lower() or "female" in v.GetDescription().lower():
+                        self._sapi.Voice = v
+                        break
+            except Exception:
+                pass
         self._sapi.Speak(text, 0)                             # synchronous
 
 

@@ -1591,3 +1591,24 @@ def test_voice_lock_is_fair_to_short_commands():
     x = np.concatenate([np.zeros(16000), np.sin(np.arange(16000) / 5) * 0.2, np.zeros(16000)]).astype(np.float32)
     sp = VoiceLock.speech(x)
     assert 16000 <= len(sp) <= 16000 + 320 * 12
+
+
+def test_kokoro_speaks_without_falling_back(monkeypatch):
+    import sys, types
+    import numpy as np
+    from lazymonster.tts import KokoroVoice, Speaker
+    played = []
+    class Stream:
+        active = False
+    fake_sd = types.SimpleNamespace(play=lambda a, samplerate: played.append(len(a)), get_stream=lambda: Stream(),
+                                    stop=lambda: None)
+    monkeypatch.setitem(sys.modules, "sounddevice", fake_sd)
+    k = KokoroVoice()
+    k.k = types.SimpleNamespace(create=lambda s, voice, speed, lang: (np.zeros(2400, np.float32), 24000))
+    s = Speaker("kokoro")
+    s.kokoro = k
+    fell_back = []
+    s.on_fallback = fell_back.append
+    s._windows = lambda text: fell_back.append("windows")
+    s.say("Hello there. This is the monster.")
+    assert played and fell_back == []
