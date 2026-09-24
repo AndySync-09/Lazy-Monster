@@ -56,7 +56,7 @@ img,svg,canvas{max-width:100%}
 
 /* nav */
 header{display:flex;align-items:center;justify-content:space-between;padding-block:24px;gap:24px;position:relative}
-header nav{display:flex;gap:32px;font-weight:500}
+header nav{display:flex;gap:clamp(14px,1.8vw,32px);font-weight:500}header nav a,header .pill,header button{white-space:nowrap}
 header nav a:hover{color:var(--lime)}
 .pill{padding:12px 22px;border-radius:999px;background:var(--lime);color:var(--ink);font-weight:600;font-size:15px;border:2px solid var(--ink);white-space:nowrap}
 .menu-btn{display:none;width:44px;height:44px;border-radius:12px;border:2px solid var(--ink);background:#fff;color:var(--ink);place-items:center}
@@ -263,6 +263,32 @@ footer{background:var(--ink);color:#D9D7EA;padding-block:64px 40px;position:rela
   html{scroll-behavior:auto}
 }
 
+/* ---- star counter ---- */
+@media (max-width:1320px){header nav a[href="#local"]{display:none}}
+@media (max-width:1180px){header .pill{display:none}}
+@media (max-width:1040px){header nav a[href="#install"],header nav a[href="#faq"]{display:none}}
+@media (max-width:520px){#soundBtn{display:none}.stars{padding-left:10px}.logo{font-size:20px!important}.logo img{width:34px!important;height:30px!important}}
+.stars{display:inline-flex;align-items:center;gap:8px;font-weight:800;font-size:14px;color:#16142B;background:#C6F432;border:3px solid #16142B;border-radius:999px;padding:6px 6px 6px 12px;text-decoration:none;box-shadow:3px 3px 0 #16142B;white-space:nowrap}
+.stars:hover{transform:translate(-1px,-1px);box-shadow:4px 4px 0 #16142B}.stars:active{transform:translate(2px,2px);box-shadow:1px 1px 0 #16142B}
+.stars svg{animation:spinstar 6s ease-in-out infinite}
+@keyframes spinstar{0%,88%,100%{transform:rotate(0)}94%{transform:rotate(72deg) scale(1.2)}}
+.stars b{background:#16142B;color:#C6F432;border-radius:999px;padding:3px 10px;font-variant-numeric:tabular-nums;min-width:2ch;text-align:center}
+.stars b.bump{animation:bump .5s cubic-bezier(.3,1.8,.5,1)}@keyframes bump{40%{transform:scale(1.3)}}
+@media (max-width:720px){.stars span{display:none}}
+/* ---- what's new ---- */
+.news{position:relative;z-index:3;margin:26px auto 0;max-width:1180px;padding:0 20px}
+.news-in{display:grid;grid-template-columns:auto 1fr auto;gap:18px;align-items:center;background:#16142B;color:#F3F1FF;border:4px solid #16142B;border-radius:24px;padding:16px 18px;box-shadow:8px 8px 0 #FF5FA2;overflow:hidden}
+.news-tag{background:#FF5FA2;color:#fff;font-weight:800;border-radius:14px;padding:10px 14px;line-height:1.05;text-transform:uppercase;letter-spacing:.04em;font-size:13px;text-align:center}
+.news-tag b{display:block;font-size:22px;letter-spacing:-.02em;text-transform:none}
+.news-body{min-width:0}.news-title{font-weight:800;font-size:18px;margin-bottom:6px}
+.news-items{display:flex;gap:10px;flex-wrap:wrap}
+.news-items span{background:#221C45;border:1px solid #3A3272;border-radius:999px;padding:6px 12px;font-size:13.5px;color:#DCD7FF;animation:pop .5s cubic-bezier(.3,1.6,.5,1) both}
+.news-items span:nth-child(2){animation-delay:.08s}.news-items span:nth-child(3){animation-delay:.16s}.news-items span:nth-child(4){animation-delay:.24s}
+@keyframes pop{from{opacity:0;transform:translateY(8px) scale(.96)}}
+.news-more{color:#C6F432;font-weight:800;text-decoration:none;white-space:nowrap;font-size:14px}
+.news-dots{display:flex;gap:6px;margin-top:10px}.news-dots i{width:8px;height:8px;border-radius:50%;background:#3A3272;cursor:pointer}.news-dots i.on{background:#C6F432}
+@media (max-width:720px){.news-in{grid-template-columns:1fr}.news-more{justify-self:start}}
+@media (prefers-reduced-motion:reduce){.stars svg,.news-items span{animation:none!important}}
 /* ---- punk layer ---- */
 .grain{position:fixed;inset:-50%;pointer-events:none;z-index:60;opacity:.07;background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2'/></filter><rect width='160' height='160' filter='url(%23n)'/></svg>");animation:grain 1s steps(6) infinite}
 @keyframes grain{0%{transform:translate(0,0)}20%{transform:translate(-3%,2%)}40%{transform:translate(2%,-3%)}60%{transform:translate(-2%,3%)}80%{transform:translate(3%,1%)}}
@@ -304,6 +330,7 @@ footer{background:var(--ink);color:#D9D7EA;padding-block:64px 40px;position:rela
   </nav>
   <div style="display:flex;gap:12px;align-items:center">
     <button class="sound" id="soundBtn" type="button" aria-pressed="false" aria-label="Sound effects"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M4 10v4h4l5 4V6L8 10z"/><path d="M16 9a4 4 0 0 1 0 6"/></svg><span>Sound off</span></button>
+    <a href="https://github.com/AndySync-09/Lazy-Monster" class="stars" id="stars" target="_blank" rel="noopener" aria-label="Star Lazy-Monster on GitHub"><svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5l2.9 6 6.6.9-4.8 4.6 1.2 6.5L12 17.4 6.1 20.5l1.2-6.5L2.5 9.4l6.6-.9z" fill="#16142B"/></svg><span>Star</span><b id="starCount" hidden>0</b></a>
     <a href="#get" class="pill">Get it on GitHub</a>
     <button class="menu-btn" type="button" aria-label="Open menu" aria-expanded="false" id="menuBtn">
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
@@ -350,6 +377,9 @@ footer{background:var(--ink);color:#D9D7EA;padding-block:64px 40px;position:rela
     </div>
   </section>
 
+  <aside class="news" id="news" aria-label="What's new" hidden><div class="news-in"><div class="news-tag">What's new<b id="newsVer"></b></div>
+    <div class="news-body"><div class="news-title" id="newsTitle"></div><div class="news-items" id="newsItems"></div><div class="news-dots" id="newsDots"></div></div>
+    <a class="news-more" href="https://github.com/AndySync-09/Lazy-Monster/blob/main/CHANGELOG.md" target="_blank" rel="noopener">Full changelog &rarr;</a></div></aside>
   <div class="ticker" aria-hidden="true"><div><span>Wake word on the NPU</span><span>0.3 s quick brain</span><span>Works offline</span><span>Drives real apps</span><span>No telemetry</span><span>Only your voice</span><span>Open source</span><span>It won't close itself</span><span>Wake word on the NPU</span><span>0.3 s quick brain</span><span>Works offline</span><span>Drives real apps</span><span>No telemetry</span><span>Only your voice</span><span>Open source</span><span>It won't close itself</span></div></div>
   <section class="strip wrap" data-buddy="sleep" data-line="Zzz. Scroll on, I am resting my eyes.">
     <p>Your PC, finally on speaking terms.</p>
@@ -1086,6 +1116,30 @@ footer{background:var(--ink);color:#D9D7EA;padding-block:64px 40px;position:rela
  document.getElementById('v169').onclick=()=>{v.src='media/lazy-monster-16x9.mp4';box.classList.remove('tall');set2('v169');};
  document.getElementById('v916').onclick=()=>{v.src='media/lazy-monster-9x16.mp4';box.classList.add('tall');set2('v916');};
  function set2(id){['v169','v916'].forEach(k=>document.getElementById(k).classList.toggle('on',k===id));}
+})();
+</script>
+
+<script id="changelog-data" type="application/json">/*CHANGELOG*/[]</script>
+<script>
+(function(){
+ // live star count from GitHub, cached for an hour so visitors don't hit the API limit
+ const REPO='AndySync-09/Lazy-Monster',KEY='lm-stars';const el=document.getElementById('starCount');
+ function show(n,anim){if(typeof n!=='number'||n<1)return;el.hidden=false;if(!anim){el.textContent=n.toLocaleString();return;}
+  const t0=performance.now(),d=900;(function f(now){const k=Math.min(1,(now-t0)/d),v=Math.round(n*(1-Math.pow(1-k,3)));el.textContent=v.toLocaleString();if(k<1)requestAnimationFrame(f);else el.classList.add('bump');})(t0);}
+ let cached=null;try{cached=JSON.parse(localStorage.getItem(KEY)||'null');}catch(e){}
+ if(cached&&Date.now()-cached.t<3600e3)show(cached.n,false);
+ else fetch('https://api.github.com/repos/'+REPO).then(r=>r.ok?r.json():null).then(j=>{if(!j)return;show(j.stargazers_count,true);try{localStorage.setItem(KEY,JSON.stringify({n:j.stargazers_count,t:Date.now()}));}catch(e){}}).catch(()=>{if(cached)show(cached.n,false);});
+ // what's new: the latest changelog entries (built in; refreshed from the repo when reachable)
+ function parse(md){const out=[];md.split(/\n(?=## )/).forEach(block=>{const m=block.match(/^## +([\d.]+)(?::\s*(.+))?/);if(!m)return;
+   const items=[];block.split('\n').forEach(l=>{const b=l.match(/^- \*\*(.+?)\*\*/);const p=l.match(/^- (.+)/);if(b)items.push(b[1].replace(/[.:]$/,''));else if(p&&items.length<4){const f=p[1].replace(/\*\*|`/g,'').split(/(?<=[.!?])\s/)[0];items.push(f.length>70?f.slice(0,67)+'\u2026':f.replace(/\.$/,''));}});
+   out.push({v:m[1],title:m[2]||'',items:items.slice(0,4)});});return out;}
+ const box=document.getElementById('news');let list=[];try{list=JSON.parse(document.getElementById('changelog-data').textContent.replace('/*CHANGELOG*/',''));}catch(e){}
+ function render(i){const e=list[i];if(!e)return;box.hidden=false;document.getElementById('newsVer').textContent=e.v;document.getElementById('newsTitle').textContent=e.title||('Version '+e.v);
+  const it=document.getElementById('newsItems');it.innerHTML='';e.items.forEach(x=>{const s=document.createElement('span');s.textContent=x;it.appendChild(s);});
+  const dots=document.getElementById('newsDots');dots.innerHTML='';list.slice(0,4).forEach((_,k)=>{const d=document.createElement('i');d.className=k===i?'on':'';d.title='Version '+list[k].v;d.onclick=()=>{cur=k;render(k);};dots.appendChild(d);});}
+ let cur=0;render(0);setInterval(()=>{if(list.length>1&&!document.hidden){cur=(cur+1)%Math.min(4,list.length);render(cur);}},7000);
+ fetch('https://raw.githubusercontent.com/'+REPO+'/main/CHANGELOG.md').then(r=>r.ok?r.text():null).then(t=>{if(!t)return;const p=parse(t);if(p.length){list=p;cur=0;render(0);}}).catch(()=>{});
+ window.__parseChangelog=parse;
 })();
 </script>
 </body>

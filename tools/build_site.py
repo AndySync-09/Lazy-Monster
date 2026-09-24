@@ -21,8 +21,37 @@ KEEP = re.compile(r'<(?:title>.*?</title|meta\s[^>]*(?:name="(?:description|twit
                   r'link\s[^>]*rel="(?:icon|canonical|apple-touch-icon)"[^>]*)>', re.S | re.I)
 
 
+def changelog_entries(md: str, limit: int = 4) -> list:
+    """The latest versions from CHANGELOG.md for the site's "What's new" strip: version, title, up to 4 short items."""
+    out = []
+    for block in re.split(r"\n(?=## )", md):
+        m = re.match(r"## +([\d.]+)(?::\s*(.+))?", block)
+        if not m:
+            continue
+        items = []
+        for line in block.splitlines():
+            b = re.match(r"- \*\*(.+?)\*\*", line)
+            p = re.match(r"- (.+)", line)
+            if b:
+                items.append(b.group(1).rstrip(".:"))
+            elif p and len(items) < 4:
+                first = re.split(r"(?<=[.!?])\s", p.group(1).replace("**", "").replace("`", ""))[0]
+                items.append(first[:67] + "\u2026" if len(first) > 70 else first.rstrip("."))
+        out.append({"v": m.group(1), "title": (m.group(2) or "").strip(), "items": items[:4]})
+        if len(out) >= limit:
+            break
+    return out
+
+
+def with_changelog(html: str) -> str:
+    import json
+    log = ROOT / "CHANGELOG.md"
+    data = changelog_entries(log.read_text(encoding="utf-8")) if log.exists() else []
+    return html.replace("/*CHANGELOG*/[]", json.dumps(data, ensure_ascii=False).replace("</", "<\\/"))
+
+
 def build(src: Path = SRC, out: Path = OUT) -> int:
-    html = src.read_text(encoding="utf-8")
+    html = with_changelog(src.read_text(encoding="utf-8"))
     head = html[: html.lower().find("</head>")] if "</head>" in html.lower() else ""
     keep = "\n".join(m.group(0) for m in KEEP.finditer(head))
     c = zlib.compressobj(9, zlib.DEFLATED, -15)                    # raw deflate, what DecompressionStream calls "deflate-raw"

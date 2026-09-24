@@ -1,8 +1,16 @@
 # Changelog
 
+## 1.7.2: stars and news
+- **Live star counter** in the site's header, counting up from GitHub (cached for an hour per visitor).
+- **What's new strip** under the hero, showing the latest releases from this changelog; it rotates through the last four and refreshes from the repo when it can.
+- **The header fits at every width:** links and buttons step back as the window narrows.
+
 ## 1.7.1: lazymonster.space
-- The website moves to **lazymonster.space** (`docs/CNAME`), with a punk layer: film grain, a glitching headline, a tilted ticker, a **Meet the monster** playground (moods, skins, outfits, Brain-Break, and a button that dissolves it into the particle monster and back), and the 40-second film with a landscape/vertical switch.
-- The site source now lives in `site/index.html`; `python tools/build_site.py` builds `docs/index.html` as a small JavaScript loader around the compressed page, so view-source shows the loader, not the markup. Title and social-preview tags stay plain HTML so search engines and link previews still work.
+- **The site moves to lazymonster.space** (`docs/CNAME`), served by GitHub Pages.
+- **A punk layer:** film grain, a glitching headline and a tilted ticker.
+- **Meet the monster:** moods, skins, outfits, Brain-Break, and a button that dissolves it into the particle monster and back.
+- **The 40-second film** on the site, landscape or vertical.
+- **Site source in `site/index.html`:** `python tools/build_site.py` builds `docs/index.html` as a small JavaScript loader around the compressed page; title and social-preview tags stay plain HTML.
 
 ## 1.7.0: Brain-Break
 - **Brain-Break: it keeps working offline.** A light connection check every 20 seconds (nothing is sent). After two misses the monster puts on its headband, the status bar turns yellow and says "Brain-Break · on-PC brain", and it tells you. Simple requests go to the quick brain on your PC (even if the quick brain is normally off, it's borrowed for the break). If your main brain is local (Ollama, llama.cpp, vLLM on this PC or your network) everything keeps working. Anything that needs the internet is kept, and when the connection is back it offers the last one again.
