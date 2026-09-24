@@ -139,13 +139,15 @@ class Engine:
         return (now < self.armed_until or bool(self.pending and now < self.pending_until)
                 or self.worker.busy.is_set() or now - self.last_activity < 4.0)
 
-    def _own_echo(self, ln, text: str) -> bool:
-        """Words the monster itself just said, coming back through the speakers."""
-        if self.echo is not None and not ln.typed and self.echo.is_echo(text):
+    def _own_echo(self, ln, text: str, final: bool = True) -> bool:
+        """Words the monster itself just said, coming back through the speakers. Only a finished
+        line can be dropped; a partial one just isn't acted on early (it may still become your request)."""
+        if self.echo is None or ln.typed or not self.echo.is_echo(text):
+            return False
+        if final:
             ln.fired = True
             self.log(event="own_echo", text=text[:80])
-            return True
-        return False
+        return True
 
     def on_partial(self, lid: int, text: str) -> None:
         self.last_activity = self.last_partial = self.clock()
@@ -153,7 +155,7 @@ class Engine:
             ln = self._line(lid)
             if ln.fired or self.turn is not None:        # mid-turn: wait for the whole sentence
                 return
-            if self._own_echo(ln, text):
+            if self._own_echo(ln, text, final=False):
                 return
             cmd = self._command(text, ln)
             if not cmd or _COMPOUND.search(cmd):

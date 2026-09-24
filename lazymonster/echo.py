@@ -19,6 +19,9 @@ LATE_OUTPUTS = re.compile(r"hdmi|display audio|nvidia high definition|\btv\b|tel
                           r"avr|receiver|monitor|dell|lg |samsung|sony|bose|jbl", re.I)
 HEADPHONES = re.compile(r"headphone|headset|earbud|airpods|buds", re.I)
 _WORD = re.compile(r"[a-z0-9']+")
+STOP = set("""hey monster a an the i you me my your we it its it's is are was be to of in on at for and or but so
+can could would will do does did what which who how this that these those please yes no ok okay just now then
+there here with from up about as if not""".split())
 
 
 def output_device_name() -> str:
@@ -40,7 +43,7 @@ def profile(name: str = None) -> dict:
 
 
 class EchoGuard:
-    def __init__(self, window: float = 8.0, clock=time.monotonic):
+    def __init__(self, window: float = 6.0, clock=time.monotonic):
         self.window, self.clock = window, clock
         self.said = deque(maxlen=12)                 # (time it finished, set of words)
 
@@ -50,12 +53,14 @@ class EchoGuard:
             self.said.append((self.clock(), words))
 
     def is_echo(self, heard: str) -> bool:
-        words = [w for w in _WORD.findall((heard or "").lower()) if w not in ("hey", "monster")]
-        if not words:
+        """Only a real chunk of its own sentence counts: at least 3 meaningful words, nearly all of
+        them just said by the monster. Short replies ("yes", "can you…") are never treated as echo,
+        because everyday words overlap with whatever it last said."""
+        words = [w for w in _WORD.findall((heard or "").lower()) if w not in STOP]
+        if len(words) < 3:
             return False
         now = self.clock()
         recent = set().union(*[w for t, w in self.said if now - t < self.window]) if self.said else set()
         if not recent:
             return False
-        overlap = sum(1 for w in words if w in recent) / len(words)
-        return overlap >= (1.0 if len(words) <= 2 else 0.7)
+        return sum(1 for w in words if w in recent) / len(words) >= 0.8

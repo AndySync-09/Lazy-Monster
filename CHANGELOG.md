@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.7.4
+- **Fix: it stopped hearing you (1.7.3).** The own-voice filter judged every half-finished line: after "Hi Andy, what can I do for you?", the first words of your reply ("hey monster can you…") matched its own words and the whole request was thrown away. Now only a finished line can be dropped, and only when it's at least three meaningful words, nearly all of them just said by the monster; everyday words ("can", "you", "what", "yes") never count.
+
 ## 1.7.3: it doesn't hear itself
 - **Its own voice no longer lands in a running task.** On a TV over HDMI, a soundbar or Bluetooth, sound arrives late and loud, so the end of the monster's sentence reached the mic after it stopped talking and was taken as something you said. Now the mic stays shut longer after it speaks on those outputs (0.9 s, 0.35 s on laptop speakers, 0.15 s on headphones; `echo_tail` to set your own), anything heard that is mostly words it just said is dropped, and during a task a scrap of audio too short for the voice lock to judge no longer counts as you.
 - **Interrupting by talking on loud speakers** needs the voice lock to recognise you; without a voice lock, only "Hey Monster" interrupts there.

@@ -1853,10 +1853,10 @@ def test_echo_guard_drops_its_own_words():
     t = [100.0]
     g = EchoGuard(clock=lambda: t[0])
     g.record("I opened the cafe site in Chrome. Want me to update the menu?")
-    assert g.is_echo("update the menu") and g.is_echo("want me to update the menu")
-    assert not g.is_echo("yes please do that") and not g.is_echo("open notepad")
+    assert g.is_echo("want me to update the menu") and g.is_echo("opened the cafe site in chrome")
+    assert not g.is_echo("yes please do that") and not g.is_echo("open notepad") and not g.is_echo("update the menu")
     t[0] += 20
-    assert not g.is_echo("update the menu")                   # long after: that's you
+    assert not g.is_echo("want me to update the menu")        # long after: that's you
     assert profile("Intel(R) Display Audio (HDMI)")["tail"] == 0.9 and profile("Speakers (Realtek(R) Audio)")["kind"] == "laptop"
     assert profile("Headphones (Sony WH-1000XM5)")["kind"] == "headphones"
 
@@ -1865,11 +1865,11 @@ def test_own_echo_never_reaches_a_running_task():
     from lazymonster.echo import EchoGuard
     eng, ex, client, said, fb = make_agent([])
     eng.echo = EchoGuard()
-    eng.echo.record("Writing the snake game now, this takes a minute")
+    eng.echo.record("Writing the snake game now, this takes about a minute")
     eng.worker.busy.set()
     heard = []
     eng.worker.agent.hear = heard.append
-    eng.on_complete(5, "this takes a minute")
+    eng.on_complete(5, "writing the snake game now")
     assert heard == []
     eng.on_complete(6, "make the snake faster")
     assert heard == ["make the snake faster"]
@@ -1885,3 +1885,15 @@ def test_scrap_of_audio_during_task_is_not_you():
     eng.on_complete(7, "okay")
     assert heard == []
     eng.worker.busy.clear()
+
+
+def test_your_reply_after_a_greeting_is_heard():
+    from lazymonster.echo import EchoGuard
+    eng, ex, client, said, fb = make_agent([[("finish", {"summary": "Opened it."})]])
+    eng.echo = EchoGuard()
+    eng.echo.record("Hi Andy, what can I do for you?")
+    for g in ("hey monster can you", "hey monster can you open", "what"):
+        assert not eng.echo.is_echo(g)
+    eng.on_partial(9, "hey monster can you")
+    eng.on_complete(9, "hey monster can you open notepad and write a note")
+    assert client.seen                                          # the request reached the brain
