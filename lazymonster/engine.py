@@ -342,6 +342,14 @@ class Engine:
             self.worker.cancel()
             self.go_to_sleep(cmd)
             return
+        if intent.name == "close_all":                   # only what the monster opened, asking about unsaved work
+            if self.agent_enabled:
+                self.feedback("thinking")
+                self.log(event="task", text=cmd)
+                self.worker.submit_task(cmd, done=self._task_done)
+            else:
+                self.say("I close only what I opened, and that needs my brain. Add one in settings.")
+            return
         if intent.name == "system_status":
             if self.agent_enabled:                       # the brain can explain what it sees
                 self.feedback("thinking")

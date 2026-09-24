@@ -330,6 +330,20 @@ def run_window(bus: UIBus, api: Api, backend, stop: threading.Event, hidden: boo
         win.events.moved += bus.on_moved           # remember where you put it
     except Exception:
         pass
+
+    def closing():
+        """Alt+F4 or anything else closing the window hides it; only Quit in the tray ends the monster."""
+        if stop.is_set():
+            return True
+        try:
+            win.hide()
+        except Exception:
+            pass
+        return False
+    try:
+        win.events.closing += closing
+    except Exception:
+        pass
     try:
         win.events.shown += lambda: tool_window(win)
     except Exception:

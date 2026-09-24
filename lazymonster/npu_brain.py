@@ -36,6 +36,7 @@ SYSTEM = ("You route requests for a voice assistant on a Windows PC. Reply with 
           'what are my reminders -> {"tool": "list_reminders", "args": {}}\n'
           'remind me at 5 to call priya -> {"tool": "set_reminder", "args": {"what": "call Priya", "when": "at 5 pm"}}\n'
           'write a haiku about rain in notepad -> {"tool": "write_in_app", "args": {"app": "Notepad", "text": "Soft rain on the roof\\nthe city exhales slowly\\npuddles hold the sky"}}\n'
+          'close everything -> {"tool": "hand_off"}\n'
           'build a snake game -> {"tool": "hand_off"}')
 
 ALIASES = {"play_music": "media_play_pause", "play": "media_play_pause", "pause": "media_play_pause",
@@ -50,6 +51,9 @@ def normalize(d: dict) -> dict:
     name = str(d.get("tool") or "").strip().split("(")[0].strip().lower().replace(" ", "_")
     name = ALIASES.get(name, name)
     args = d.get("args") if isinstance(d.get("args"), dict) else {}
+    if name == "close_app" and str(args.get("app", "")).lower().strip() in ("everything", "all", "it all", "all windows",
+                                                                             "all apps", "yourself", "you", "monster"):
+        return {"tool": "hand_off", "args": {}}              # "close everything" is the careful close_all, not an app
     if name == "open_app" and _URL.match(str(args.get("app", ""))):
         name, args = "open_url", {"url": args["app"]}          # "open github.com"
     return {"tool": name, "args": args}

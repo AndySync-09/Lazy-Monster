@@ -166,3 +166,10 @@ def safe_packages(spec: str) -> list:
         if p.startswith("-") or not _PKG.match(p):
             raise GuardError(f"'{p}' is not a plain package name")
     return pkgs
+
+
+def is_self_name(app: str) -> bool:
+    """"Close Lazy-Monster", "close yourself": the monster never closes itself."""
+    import re as _re
+    a = (app or "").lower().replace("-", " ")
+    return bool(_re.search(r"\b(lazy monster|monster|yourself|you)\b", a)) or a.strip() in ("me", "it")

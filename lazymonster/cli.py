@@ -309,7 +309,7 @@ def status_event(cfg, agent_enabled: bool, info: dict, voice: str) -> dict:
     if (cfg.decider or "") == "jev" and short:
         short += " + Jev"
     if info.get("quick") and short:
-        short += " + NPU"
+        short += " + quick " + str(info["quick"])
     return {"type": "status", "wake_dev": dev or "ears",
             "wake_title": f"{wake}. {info.get('stt', '')}." + (f" Push-to-talk: {info['ptt']}." if info.get("ptt") else ""),
             "brain": short if agent_enabled else "", "big": bool(cfg.go_big and agent_enabled),

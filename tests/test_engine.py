@@ -1802,3 +1802,19 @@ def test_quick_brain_near_misses_map_to_real_tools():
     assert normalize(parse('{"tool": "play_music", "args": {}}'))["tool"] == "media_play_pause"
     assert normalize(parse('{"tool": "open_app", "args": {"app": "github.com"}}')) == {"tool": "open_url", "args": {"url": "github.com"}}
     assert normalize(parse('{"tool": "open_app", "args": {"app": "Spotify"}}'))["tool"] == "open_app"
+
+
+def test_close_everything_is_the_careful_close():
+    eng, ex, client, said, fb = make_agent([[("close_all", {})], [("finish", {"summary": "Closed what I opened."})]])
+    eng.on_complete(1, "hey monster close everything")
+    assert client.seen and said[-1].startswith("Closed what I opened.")
+    from lazymonster.grammar import Grammar
+    assert Grammar().parse("close all windows").name == "close_all"
+    assert Grammar().parse("close notepad").name == "close_app"
+
+
+def test_monster_wont_close_itself():
+    from lazymonster.guards import is_self_name
+    from lazymonster.npu_brain import normalize
+    assert is_self_name("Lazy-Monster") and is_self_name("yourself") and not is_self_name("notepad")
+    assert normalize({"tool": "close_app", "args": {"app": "everything"}})["tool"] == "hand_off"

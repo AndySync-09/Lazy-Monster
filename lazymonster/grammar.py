@@ -84,6 +84,8 @@ RULES: List[Rule] = [
      lambda m: {"page": (m["p"] or m["p2"] or "").strip()}),
     ("search_web", _r(r"(?:search(?: the web)?(?: for)?|google|look up) (?P<q>.+)"), lambda m: {"query": m["q"]}),
     ("type_text", _r(r"(?:type|dictate) (?P<t>.+)"), lambda m: {"text": m["t"]}),
+    ("close_all", _r(r"(?:close|quit|shut) (?:everything|it all|all(?: (?:the )?(?:windows|apps|of it|of them))?)(?: you opened)?(?: down)?"),
+     lambda m: {}),
     ("close_app", _r(r"(?:close|quit|exit|kill) (?P<a>.+)"), lambda m: {"app": m["a"]}),
     ("open_app", _r(r"(?:open|launch|start|run|go to) (?P<a>.+)"), lambda m: {"app": m["a"]}),
 ]

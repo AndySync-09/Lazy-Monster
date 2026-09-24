@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.6.3
+- **Fix: "close everything" closed the monster too.** "Close everything", "close all windows" and "close it all" now always mean the careful close: only what the monster opened, asking about unsaved work. On top of that the monster can't close itself any more: its own window is never recorded as something it opened, "close" can't target it (by name or process), close keys aren't pressed while its window is in front, and closing its window (Alt+F4 or any other way) just hides it. Only Quit in the tray ends it.
+- The quick brain hands "close everything" to the main brain instead of guessing an app called "everything".
+- Labels name the device the quick brain actually runs on (it was chosen on the GPU).
+
 ## 1.6.2
 - **Quick brain on the GPU: 0.6 s.** Measured on a Core Ultra 9 185H: the same Qwen2.5 1.5B model took 3.8 s per request on the NPU and 0.6 s on the Arc GPU, so the benchmark now prefers whichever is faster at equal accuracy.
 - **Accuracy back up.** The short prompt from 1.6.1 cost accuracy (11/12 fell to 7/12); on the GPU prompt length barely matters, so the descriptive prompt is back with more examples. Where OpenVINO supports it, the output is constrained to real tool names, so the model can't invent "play_music". Near-misses ("mute()", "play_music", "open github.com" as an app) are mapped to the real tool.

@@ -222,6 +222,8 @@ class WindowsExecutor:
         from . import uia
         from ..guards import check_not_sensitive, check_type_target, is_editing, parse_keys
         parts = parse_keys(keys)
+        if is_self_window(user32.GetForegroundWindow()) and any(p.lower() in ("f4", "w", "q") for p in parts):
+            return False, "my own window is in front; I won't press close keys on myself"
         self._ensure_target()
         title, _ = uia.guard_focused_input()
         check_not_sensitive(title)
@@ -357,6 +359,8 @@ class WindowsExecutor:
         chord(VK["CONTROL"], VK["W"]); return True, "closed tab"
 
     def _minimize(self):
+        if is_self_window(user32.GetForegroundWindow()):
+            return False, "that's my own window in front"
         user32.ShowWindow(user32.GetForegroundWindow(), 6); return True, "minimized"
 
     def _maximize(self):
@@ -411,9 +415,13 @@ class WindowsExecutor:
             return True, f"opened {key}"
 
     def _close_app(self, app):
+        if is_self_name(app):
+            return False, "that's me: say 'Hey Monster, sleep' to put me away, or quit from the tray icon"
         key = app if app in self.apps.apps else self.apps.resolve(app)
         entry = self.apps.apps.get(key) if key else None
         proc = entry and entry.get("process")
+        if proc and proc.lower() in SELF_PROCS:
+            return False, "that's me: say 'Hey Monster, sleep' to put me away, or quit from the tray icon"
         if not proc:
             return False, f"don't know the process for {app}; add it to config"
         _run(["taskkill", "/IM", proc])            # graceful: apps may ask to save
@@ -438,8 +446,8 @@ class WindowsExecutor:
 
     # ---- ownership: close what the monster opened, and only that -------------------
     def _own(self, hwnd, app, proc=""):
-        if not hwnd or any(o.get("hwnd") == hwnd for o in self.owned):
-            return
+        if not hwnd or is_self_window(hwnd) or any(o.get("hwnd") == hwnd for o in self.owned):
+            return                                   # never record the monster's own window as something it opened
         import win32gui
         self.owned.append({"kind": "window", "hwnd": hwnd, "app": str(app), "proc": (proc or "").lower(),
                            "title": win32gui.GetWindowText(hwnd), "label": str(app).title()})
@@ -508,6 +516,8 @@ class WindowsExecutor:
         import win32con
         import win32gui
         from . import uia
+        if o.get("hwnd") and is_self_window(o["hwnd"]):
+            return "skipped (that's me)"
         if o["kind"] == "proc":
             o["proc"].terminate()
             return f"stopped {o['label']}"
@@ -642,3 +652,29 @@ class WindowsExecutor:
         except Exception:
             img = None
         return {"title": title, "app": proc or "", "text": text[:8000], "image": img}
+
+
+# ---- the monster never closes itself ---------------------------------------------------------
+SELF_PROCS = {"monsterw.exe", "monster.exe", "pythonw.exe", "python.exe", "msedgewebview2.exe"}
+
+
+from ..guards import is_self_name  # noqa: E402
+
+
+def is_self_window(hwnd) -> bool:
+    """A window of this process (the monster's UI or its browser engine children)."""
+    try:
+        import win32gui
+        import win32process
+        if not hwnd:
+            return False
+        if win32gui.GetWindowText(hwnd) == "Lazy-Monster":
+            return True
+        pid = win32process.GetWindowThreadProcessId(hwnd)[1]
+        if pid == os.getpid():
+            return True
+        import psutil
+        p = psutil.Process(pid)
+        return p.name().lower() == "msedgewebview2.exe" and any(a.pid == os.getpid() for a in p.parents())
+    except Exception:
+        return False
