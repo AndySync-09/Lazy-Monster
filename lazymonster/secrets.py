@@ -5,7 +5,8 @@ import subprocess
 
 from .platform_info import IS_MAC
 
-KEYCHAIN_SERVICE = {"OPENAI_API_KEY": "lazymonster-openai"}
+KEYCHAIN_SERVICE = {"OPENAI_API_KEY": "lazymonster-openai", "ANTHROPIC_API_KEY": "lazymonster-anthropic",
+                    "TYPESAFE_API_KEY": "lazymonster-typesafe", "JEV_API_KEY": "lazymonster-typesafe"}
 
 
 def get_key(env_name: str) -> str:

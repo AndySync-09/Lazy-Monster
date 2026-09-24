@@ -100,6 +100,7 @@ class Conversation:
             if fresh:
                 sounds.play("wake", self.chimes)
                 self.woke_at = self.clock()
+                self._told_not_you = False
             self.set(LISTENING)
             if fresh and self.greet:
                 t = threading.Timer(self.greet_after, self._maybe_greet)
@@ -142,6 +143,13 @@ class Conversation:
             self.set(THINKING)
         elif e in ("agent_done", "task_error"):
             self.asking = False
+        elif e == "not_you":
+            # Say so once per wake, instead of silently ignoring you if the voiceprint is off
+            if self.clock() - self.woke_at < 20 and not getattr(self, "_told_not_you", False):
+                self._told_not_you = True
+                hint = "That didn't sound like you, so I'm ignoring it. Press Control Alt Space if it was you."
+                self.emit({"type": "say", "text": hint})
+                threading.Thread(target=self.speaker.say, args=(hint,), daemon=True).start()
 
     def greeting(self) -> str:
         from .userinfo import GREETINGS

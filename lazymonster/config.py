@@ -19,12 +19,15 @@ class Config:
     require_prefix: bool = True
     always_listen: bool = False
     apps: dict = field(default_factory=dict)
-    planner: str = "openai"          # openai | jev | none  (agent brain)
+    planner: str = "openai"          # openai | anthropic | none  (the agent's brain)
+    decider: str = ""                # "jev": TypeSafe's Jev makes fast yes/no/choice calls around the brain
     accelerator: str = "auto"        # auto | npu | gpu | cpu  (for on-device models)
     agent_max_steps: int = 16
     escalation_model: str = "gpt-6-astra"   # stronger model after 2 failures or a long task; "" = never
     voice: str = "kokoro"            # kokoro (local) | openai | windows | off
     kokoro_voice: str = "af_heart"   # af_heart, af_bella, af_nicole, bf_emma, hf_alpha, hf_beta, ...
+    kokoro_model_path: str = ""      # your own Kokoro-format .onnx (leave empty for the default download)
+    kokoro_voices_path: str = ""     # and its voices .bin
     kokoro_speed: float = 1.05
     kokoro_quality: str = "fp32"     # fp32 (best) | fp16 | int8 (smallest)
     stt_refine: bool = True          # re-hear agent requests with Whisper (local)
@@ -54,9 +57,14 @@ class Config:
     openai_base_url: str = "https://api.openai.com/v1"
     openai_timeout: float = 90.0
     openai_reasoning_effort: str = "low"   # dropped automatically if the model doesn't support it
-    jev_url: str = ""
-    jev_api_key_env: str = "JEV_API_KEY"
-    jev_timeout: float = 30.0
+    anthropic_model: str = "claude-haiku-4-5-20251001"
+    anthropic_escalation_model: str = "claude-sonnet-5"
+    anthropic_api_key_env: str = "ANTHROPIC_API_KEY"
+    anthropic_base_url: str = "https://api.anthropic.com/v1"
+    jev_api_key_env: str = "TYPESAFE_API_KEY"
+    jev_base_url: str = "https://api.typesafe.ai"
+    jev_model: str = "jev-latest"
+    jev_timeout: float = 2.5
     log_text: bool = True
     beeps: bool = True
 
@@ -70,7 +78,7 @@ class Config:
             with open(src, "rb") as f:
                 data = tomllib.load(f)
             for k, v in data.get("lazymonster", data).items():
-                if k in ("jev", "openai") and isinstance(v, dict):
+                if k in ("jev", "openai", "anthropic") and isinstance(v, dict):
                     for jk, jv in v.items():
                         if hasattr(cfg, f"{k}_{jk}"):
                             setattr(cfg, f"{k}_{jk}", jv)
@@ -78,7 +86,6 @@ class Config:
                     setattr(cfg, k, v)
         cfg.planner = os.environ.get("LAZYMONSTER_PLANNER", cfg.planner)
         cfg.openai_model = os.environ.get("LAZYMONSTER_OPENAI_MODEL", cfg.openai_model)
-        cfg.jev_url = os.environ.get("JEV_API_URL", cfg.jev_url)
         return cfg
 
 

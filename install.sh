@@ -23,6 +23,37 @@ die()  { printf "\n\033[31m  %s\033[0m\n" "$1"; exit 1; }
 [ "$(uname)" = "Darwin" ] || die "This installer is for macOS. On Windows use install.ps1."
 printf "\n\033[35m  Lazy-Monster installer\033[0m\n  Say it. The monster does it.\n"
 
+# 0. Brain first ----------------------------------------------------------------------------
+printf "\n\033[32m  Choose the monster's brain\033[0m\n"
+note "1  OpenAI (GPT)   2  Claude (Anthropic)   3  None for now (instant commands only)"
+BRAIN="${LM_BRAIN:-}"
+if [ -z "$BRAIN" ] && [ -r "$TTY" ]; then printf "      Pick 1-3 [1]: "; read -r BRAIN < "$TTY" || BRAIN=""; fi
+case "$BRAIN" in 2|claude|anthropic) BRAIN=anthropic ;; 3|none) BRAIN=none ;; *) BRAIN=openai ;; esac
+if [ "$BRAIN" != "none" ]; then
+  case "$BRAIN" in openai) ENVN=OPENAI_API_KEY; SVC=lazymonster-openai ;; anthropic) ENVN=ANTHROPIC_API_KEY; SVC=lazymonster-anthropic ;; esac
+  if security find-generic-password -s "$SVC" >/dev/null 2>&1; then
+    note "Found your $ENVN in the Keychain. Keeping it."
+  else
+    KEY="${!ENVN:-}"
+    if [ -z "$KEY" ] && [ -r "$TTY" ]; then printf "      Paste your %s (hidden): " "$ENVN"; read -rs KEY < "$TTY" || KEY=""; echo; fi
+    if [ -n "$KEY" ]; then security add-generic-password -U -a "$USER" -s "$SVC" -w "$KEY"; note "Saved in your Keychain."
+    else note "No key: instant commands only for now."; BRAIN=none; fi
+  fi
+fi
+
+DECIDER=""
+JEV="${LM_JEV:-}"
+note "Optional: Jev by TypeSafe makes fast yes/no and choice calls (ignores room chatter, picks the model)."
+if [ -z "$JEV" ] && [ -r "$TTY" ]; then printf "      Add Jev? Needs a TypeSafe API key. [y/N]: "; read -r JEV < "$TTY" || JEV=""; fi
+case "$JEV" in [yY]*)
+  if ! security find-generic-password -s lazymonster-typesafe >/dev/null 2>&1; then
+    JKEY="${TYPESAFE_API_KEY:-}"
+    if [ -z "$JKEY" ] && [ -r "$TTY" ]; then printf "      Paste your TYPESAFE_API_KEY (hidden): "; read -rs JKEY < "$TTY" || JKEY=""; echo; fi
+    [ -n "$JKEY" ] && security add-generic-password -U -a "$USER" -s lazymonster-typesafe -w "$JKEY"
+  fi
+  DECIDER=jev ;;
+esac
+
 # 1. Python -----------------------------------------------------------------------------
 step 1 "Checking for Python 3.11 or newer"
 find_python() {
@@ -80,24 +111,10 @@ if ! grep -qs '.local/bin' "$PROFILE"; then
   note "Added 'monster' to your PATH (new terminals)"
 fi
 
-# 4. Key --------------------------------------------------------------------------------
-step 4 "OpenAI API key (for bigger tasks)"
-if security find-generic-password -s lazymonster-openai >/dev/null 2>&1; then
-  note "Already in your Keychain. Keeping it."
-else
-  KEY="${OPENAI_API_KEY:-}"
-  if [ -z "$KEY" ] && [ -r "$TTY" ]; then
-    printf "      Paste your OpenAI API key, or press Enter to skip: "
-    read -rs KEY < "$TTY" || KEY=""
-    echo
-  fi
-  if [ -n "$KEY" ]; then
-    security add-generic-password -U -a "$USER" -s lazymonster-openai -w "$KEY"
-    note "Saved in your macOS Keychain."
-  else
-    note "Skipped. Instant commands work without it."
-  fi
-fi
+# 4. Brain (chosen at the start, saved now) --------------------------------------------------
+"$PY" -c "from lazymonster.config import save_setting as s; s('planner', '$BRAIN')"
+"$PY" -c "from lazymonster.config import save_setting as s; s('decider', '$DECIDER')"
+note "Brain: $BRAIN ${DECIDER:+(+ Jev)}"
 
 # 5. Models, permissions and your voice ------------------------------------------------------
 step 5 "Voice models (about 1 GB, one time), permissions and your voice"

@@ -16,6 +16,7 @@ Lazy-Monster controls a real computer from a microphone. We treat that seriously
 - **Web research** sends your research question to the configured OpenAI endpoint, which searches the web. Harder tasks may be sent to `escalation_model` (set it to "" to never use a second model).
 - **Voice lock.** Once you enroll, spoken requests are only carried out if they match your voiceprint (stored locally in `%LOCALAPPDATA%\\lazymonster\\models\\voicelock`). Voice matching is strong against other people and recordings of other people, but not proof against a recording of your own voice; risky actions still need your spoken "yes".
 - **macOS permissions.** On a Mac it needs Microphone, Accessibility (click and type), Automation (drive apps) and Input Monitoring (hotkey). The same guards apply: blocked apps include Terminal, iTerm, Keychain Access and System Settings. The API key is stored in your login Keychain.
+- **Jev (optional).** With `decider = "jev"`, the text of a request (and the monster's last sentence, for follow-ups) is sent to TypeSafe's API for yes/no and choice decisions. Nothing else, and never audio.
 - **Honest limit.** UI control means the agent acts with your permissions in apps that are not blocked. Watch it work, and say "Hey Monster, stop" or press Ctrl+C to cancel.
 - **Local confirmation.** Sleep, shutdown, restart, and plans that type into the focused window need your spoken "yes" or a click on Approve. A model cannot supply or skip it.
 - **Sandboxed output.** Files are written only to `Documents\LazyMonster` and are never overwritten.

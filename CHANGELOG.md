@@ -1,5 +1,20 @@
 # Changelog
 
+## 1.0.2: Jev, done right
+- **Jev is a decider, not a brain.** 1.0.1 treated Jev as a chat model. It isn't: TypeSafe's Jev answers typed questions (yes/no probability, a choice, a score) through its System One API (`POST https://api.typesafe.ai/v1/systemone`). The brain stays OpenAI or Claude; with `decider = "jev"` Jev makes the quick calls around it:
+  - **"Was that meant for me?"** In the follow-up window (no wake word), speech that isn't addressed to the monster is ignored: phone calls, TV, talking to someone else.
+  - **Which tool, how hard.** One call at the start of each task gives the decision tree Jev's real probabilities, and hard tasks start on the stronger model straight away.
+  - **Did you say yes?** "Sure, go for it" counts as yes for running code or installing packages.
+  - Short timeout and no dependency: if Jev is down, everything works as before.
+- The installer asks for the brain (OpenAI or Claude), then offers Jev with its TypeSafe key and a live test question. `monster doctor` checks Jev too.
+
+## 1.0.1
+- **Choose the brain first.** The installer starts by asking OpenAI, Claude (Anthropic) or Jev (any OpenAI-compatible endpoint), checks the key, and only then installs. `planner = "anthropic"` uses Claude through the Messages API (web research through Claude's web search tool); updates keep your choice.
+- **The monster-themed setup.** Mascot, colours and a live mic meter. Wake-word training and voice enrollment listen for you by themselves: no Enter before every take, a take stops when you pause, and silent or partial takes are redone.
+- **Voice lock can't lock you out.** Takes that don't match the rest are re-recorded; if your takes still don't agree (noisy room), the lock stays off instead of saving a bad voiceprint (1.0.0 saved one with 0.44 consistency, which ignored you). When it does ignore a voice after "Hey Monster", it says so once and tells you to press Ctrl+Alt+Space. `monster voice-lock on|off`.
+- **Make it yours:** `monster voices` (list, hear, pick), your own Kokoro-format voice files, your own Whisper export as a folder. See docs/VOICES.md.
+- `monster service status` shows the brain, voice lock and push-to-talk state, and the key startup lines from the log.
+
 ## 1.0.0: first release (Windows)
 Lazy-Monster's first public release, for Windows 10 and 11. Everything in 0.1 to 0.11 below, installable with one command:
 `irm https://raw.githubusercontent.com/AndySync-09/lazy-monster/main/install.ps1 | iex`

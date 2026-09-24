@@ -166,6 +166,7 @@ class Agent:
         self.step_budget = 8                      # after this, wrap up instead of wandering
         self.max_questions = 2                    # per task
         self.approved = {}                        # (tool, project) -> time: say yes once per project per session
+        self.jev = None                           # optional decider (jev.py): routing, difficulty, yes/no
 
     def _system(self) -> str:
         if not self.journal:
@@ -279,6 +280,9 @@ class Agent:
         q = self.ASK_FIRST[intent.name].format(**intent.args)
         ans = self._listen(q)
         ok = bool(ans and self._YES.match(ans))
+        if ans and not ok and self.jev is not None:          # "sure, go for it" / "why not": let Jev judge
+            p = self.jev.agreed(q, ans)
+            ok = p is not None and p >= 0.8
         if ok:
             self.approved[key] = self.clock()
         self.log(event="approval", intent=intent.name, ok=ok, text=ans or "")
@@ -291,6 +295,14 @@ class Agent:
         questions = 0
         first_action = None
         escalated = False
+        if self.jev is not None:
+            from . import intents as _i                        # (aliased: a bare import would shadow AGENT_TOOLS)
+            plan = self.jev.plan(task, {n: _i.SCHEMA[n].get("desc", n)[:200] for n in _i.AGENT_TOOLS})
+            if plan:
+                self.log(event="agent_think", step=0, ms=0, candidates=plan["candidates"], source="jev")
+                if plan.get("difficulty") is not None and plan["difficulty"] >= 1.5 and self.escalation is not None:
+                    client, escalated = self.escalation, True          # hard from the start: stronger model now
+                    self.log(event="escalated", model=getattr(client, "model", "?"), step=0, reason="jev: hard task")
         while not self.inbox.empty():                  # stale speech from before this task
             self.inbox.get_nowait()
         messages = self._start_messages(task)
@@ -387,8 +399,9 @@ class Agent:
                             out = self._close_all()
                         elif intent.name == "web_research":
                             try:
-                                out = research(client if hasattr(client, "base_url") else self.client,
-                                               intent.args["question"])
+                                brain = client if hasattr(client, "base_url") else self.client
+                                out = (brain.research(intent.args["question"]) if hasattr(brain, "research")
+                                       else research(brain, intent.args["question"]))
                             except Exception as e:
                                 out = f"ERROR: {e}"
                         else:
@@ -436,22 +449,124 @@ def _short(args: dict, text: str) -> str:
     return f"{a} -> {first}"
 
 
-class JevClient:
-    """Placeholder for the Jev Engineering API. Implement chat() to return the
-    same shape as ChatClient.chat() (choices[0].message with optional tool_calls)."""
+class ClaudeClient:
+    """Anthropic Messages API, presented with the same chat() shape as ChatClient,
+    so the agent loop doesn't care which brain it talks to. The agent keeps its
+    history in the OpenAI format; this converts both ways."""
 
-    def __init__(self, url: str, api_key_env: str = "JEV_API_KEY", timeout: float = 60.0):
-        self.url, self.timeout, self.key = url, timeout, os.environ.get(api_key_env, "")
+    VERSION = "2023-06-01"
+
+    def __init__(self, model: str, api_key_env: str = "ANTHROPIC_API_KEY",
+                 base_url: str = "https://api.anthropic.com/v1", timeout: float = 90.0, max_tokens: int = 4096):
+        from .secrets import get_key
+        self.model, self.base_url, self.timeout, self.max_tokens = model, base_url.rstrip("/"), timeout, max_tokens
+        self.key = get_key(api_key_env)
+        if not self.key:
+            raise AgentError(f"{api_key_env} is not set")
+
+    @staticmethod
+    def to_anthropic(messages: list, tools=None) -> dict:
+        system, out = [], []
+
+        def push(role, blocks):
+            if out and out[-1]["role"] == role:               # the API wants strict turn-taking
+                out[-1]["content"].extend(blocks)
+            else:
+                out.append({"role": role, "content": list(blocks)})
+
+        for m in messages:
+            role, content = m.get("role"), m.get("content") or ""
+            if role == "system":
+                if not out:
+                    system.append(content)
+                else:                                          # mid-task notes (step budget) go in as user text
+                    push("user", [{"type": "text", "text": f"[note] {content}"}])
+            elif role == "user":
+                push("user", [{"type": "text", "text": content}])
+            elif role == "assistant":
+                blocks = [{"type": "text", "text": content}] if content.strip() else []
+                for tc in m.get("tool_calls") or []:
+                    fn = tc.get("function", {})
+                    try:
+                        args = json.loads(fn.get("arguments") or "{}")
+                    except ValueError:
+                        args = {}
+                    blocks.append({"type": "tool_use", "id": tc.get("id") or "call", "name": fn.get("name", ""),
+                                   "input": args})
+                if blocks:
+                    push("assistant", blocks)
+            elif role == "tool":
+                push("user", [{"type": "tool_result", "tool_use_id": m.get("tool_call_id") or "call",
+                               "content": str(content)}])
+        if out and out[0]["role"] != "user":
+            out.insert(0, {"role": "user", "content": [{"type": "text", "text": "(continue)"}]})
+        body = {"system": "\n\n".join(system), "messages": out}
+        if tools:
+            body["tools"] = [{"name": t["function"]["name"], "description": t["function"].get("description", ""),
+                              "input_schema": t["function"].get("parameters", {"type": "object", "properties": {}})}
+                             for t in tools]
+            body["tool_choice"] = {"type": "auto"}
+        return body
+
+    @staticmethod
+    def to_openai(data: dict) -> dict:
+        text, calls = [], []
+        for b in data.get("content", []) or []:
+            if b.get("type") == "text":
+                text.append(b.get("text", ""))
+            elif b.get("type") == "tool_use":
+                calls.append({"id": b.get("id"), "type": "function",
+                              "function": {"name": b.get("name"), "arguments": json.dumps(b.get("input") or {})}})
+        msg = {"role": "assistant", "content": "\n".join(t for t in text if t)}
+        if calls:
+            msg["tool_calls"] = calls
+        return {"choices": [{"message": msg}]}
+
+    def _post(self, body: dict) -> dict:
+        import requests
+        r = requests.post(f"{self.base_url}/messages", json=body, timeout=self.timeout,
+                          headers={"x-api-key": self.key, "anthropic-version": self.VERSION,
+                                   "content-type": "application/json"})
+        if r.status_code != 200:
+            raise AgentError(f"HTTP {r.status_code}: {r.text[:300]}")
+        return r.json()
 
     def chat(self, messages, tools=None) -> dict:
-        raise AgentError("Jev client is a placeholder: implement JevClient.chat() against the Jev API")
+        body = self.to_anthropic(messages, tools)
+        body.update(model=self.model, max_tokens=self.max_tokens)
+        return self.to_openai(self._post(body))
+
+    def research(self, question: str) -> str:
+        body = {"model": self.model, "max_tokens": 2048,
+                "messages": [{"role": "user", "content": "Research this and answer in 5-8 plain sentences with the key "
+                                                         f"facts and dates. Question: {question}"}],
+                "tools": [{"type": "web_search_20250305", "name": "web_search", "max_uses": 4}]}
+        data = self._post(body)
+        text, sources = [], []
+        for b in data.get("content", []) or []:
+            if b.get("type") == "text":
+                text.append(b.get("text", ""))
+                for c in b.get("citations") or []:
+                    if c.get("url"):
+                        sources.append((c.get("title") or c["url"], c["url"]))
+        refs = "\n".join(f"- {t}: {u}" for t, u in list(dict.fromkeys(sources))[:6])
+        return ("".join(text).strip() or "(no answer)") + (f"\nSources:\n{refs}" if refs else "\n(no sources returned)")
 
 
-def build_client(cfg):
+def build_client(cfg, escalation: bool = False):
+    """The agent's brain. escalation=True returns the stronger model for hard tasks (or None)."""
     p = cfg.planner.lower()
     if p == "openai":
-        return ChatClient(cfg.openai_model, cfg.openai_api_key_env, cfg.openai_base_url,
-                          cfg.openai_timeout, cfg.openai_reasoning_effort)
+        model = cfg.escalation_model if escalation else cfg.openai_model
+        if escalation and (not model or model == cfg.openai_model):
+            return None
+        return ChatClient(model, cfg.openai_api_key_env, cfg.openai_base_url, cfg.openai_timeout, cfg.openai_reasoning_effort)
+    if p in ("anthropic", "claude"):
+        model = cfg.anthropic_escalation_model if escalation else cfg.anthropic_model
+        if escalation and (not model or model == cfg.anthropic_model):
+            return None
+        return ClaudeClient(model, cfg.anthropic_api_key_env, cfg.anthropic_base_url, cfg.openai_timeout)
     if p == "jev":
-        return JevClient(cfg.jev_url, cfg.jev_api_key_env, cfg.jev_timeout)
+        raise AgentError("Jev is a decision model (yes/no, choice, score), not a brain that writes. "
+                         "Set planner to openai or anthropic, and decider = \"jev\" to use Jev alongside it.")
     return None

@@ -3,6 +3,7 @@ distilled Whisper model through OpenVINO GenAI, on the NPU when available.
 Pass 1 (Moonshine streaming) stays in charge of the wake phrase and instant
 commands; this pass decides what the agent actually hears."""
 import collections
+from pathlib import Path
 import re
 
 import numpy as np
@@ -82,7 +83,8 @@ class WhisperRefiner:
     def __init__(self, repo: str = "OpenVINO/distil-whisper-large-v3-int8-ov", device: str = "auto",
                  vocabulary: Iterable[str] = ()):
         self.repo, self.pref = repo, device
-        self.path = models_dir() / repo.replace("/", "__")
+        local = Path(repo).expanduser()
+        self.path = local if local.is_dir() else models_dir() / repo.replace("/", "__")   # your own export works too
         self.vocab = list(dict.fromkeys(list(vocabulary) + VOICE_WORDS))
         self.pipe, self.device, self.errors = None, None, {}
         self._prompt_ok = True

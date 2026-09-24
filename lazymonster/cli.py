@@ -61,10 +61,10 @@ def _build(cfg: Config, dry_run: bool, logger=None, feedback=None, clock=time.mo
             if client is not None:
                 worker.agent = Agent(client, executor, log, say, max_steps=cfg.agent_max_steps, clock=clock)
                 worker.agent.journal = True
-                if cfg.escalation_model and cfg.planner == "openai" and cfg.escalation_model != cfg.openai_model:
-                    from .agent import ChatClient
-                    worker.agent.escalation = ChatClient(cfg.escalation_model, cfg.openai_api_key_env, cfg.openai_base_url,
-                                                         cfg.openai_timeout, cfg.openai_reasoning_effort)
+                try:
+                    worker.agent.escalation = build_client(cfg, escalation=True)
+                except Exception:
+                    worker.agent.escalation = None
         except AgentError as e:
             print(f"  agent off: {e}", file=sys.stderr)
     engine = Engine(grammar, WakeSpotter(cfg.wake_names, require_prefix=cfg.require_prefix),
@@ -73,6 +73,12 @@ def _build(cfg: Config, dry_run: bool, logger=None, feedback=None, clock=time.mo
                     logger=logger, clock=clock, say=say, on_exit=on_exit)
     if worker.agent is not None:
         worker.agent.on_sleep = engine.go_to_sleep
+    from .jev import build_jev
+    jev = build_jev(cfg, log=log)
+    if jev is not None:
+        engine.jev = jev
+        if worker.agent is not None:
+            worker.agent.jev = jev
     return apps, grammar, engine
 
 
@@ -103,6 +109,10 @@ def _file_logger(cfg: Config):
         elif e == "agent_done":
             fa = ev.get("first_action_s")
             print(f"  finished in {ev['steps']} steps, {ev['s']} s" + (f" (first action after {fa} s)" if fa is not None else ""), flush=True)
+        elif e == "not_you":
+            print(f"  voice lock: not your voice (similarity {ev.get('score')}); ignored", flush=True)
+        elif e == "not_for_me":
+            print(f"  ignored (Jev: not meant for me, p={ev.get('p')}): {ev.get('text')}", flush=True)
         elif e == "escalated":
             print(f"  handing this one to {ev.get('model')} (harder task)", flush=True)
         elif e in ("task_error", "unknown"):
@@ -164,7 +174,7 @@ def _start_voice(cfg, a, engine, apps, speaker, conv, on_partial=None, on_level=
             if lock is None:
                 status("voice lock: not enrolled (monster voice-enroll) - anyone can command it")
             else:
-                engine.verify = lambda t0: lock.check(tap.slice(t0))[0]
+                engine.verify = lambda t0: lock.check(tap.slice(t0))
                 info["lock"] = "voice lock on"
                 status("voice lock: on (only your voice; typed requests and push-to-talk always work)")
         except Exception as e:
@@ -238,6 +248,14 @@ def _conversation(cfg, engine, speaker, stop, emit=lambda ev: None):
     return conv
 
 
+def brain_label(cfg, enabled=True) -> str:
+    if not enabled:
+        return "agent off"
+    p = cfg.planner.lower()
+    base = {"openai": cfg.openai_model, "anthropic": cfg.anthropic_model, "claude": cfg.anthropic_model}.get(p, p)
+    return base + (" + Jev" if (cfg.decider or "").lower() == "jev" else "")
+
+
 def cmd_run(a, cfg):
     cfg.model = a.model or cfg.model
     cfg.always_listen = a.always or cfg.always_listen
@@ -252,7 +270,7 @@ def cmd_run(a, cfg):
                              _compose(relay.feedback, make_feedback(cfg.beeps)), on_exit=stop.set, speaker=speaker)
     relay.conv = conv = _conversation(cfg, engine, speaker, stop)
     print(f"Lazy-Monster {__version__} · {len(apps.apps)} apps · agent="
-          f"{cfg.openai_model if engine.agent_enabled and cfg.planner == 'openai' else cfg.planner if engine.agent_enabled else 'off'}"
+          f"{brain_label(cfg, engine.agent_enabled)}"
           f" · voice={cfg.voice} · {'DRY RUN' if a.dry_run else 'LIVE'}")
     mic, tap, _, _, _ = _start_voice(cfg, a, engine, apps, speaker, conv, status=lambda m: print("  " + m, flush=True))
     print("Say “Hey Monster, …”   Say “Hey Monster, sleep” to exit.")
@@ -322,7 +340,7 @@ def cmd_ui(a, cfg):
             held["tray"] = Tray(bus, speaker, gate, det_ref, stop, conv=conv, engine=engine).start()
         except Exception as e:
             print(f"  tray icon off ({type(e).__name__}: {str(e)[:80]})")
-        agent = cfg.openai_model if engine.agent_enabled and cfg.planner == "openai" else ("agent off" if not engine.agent_enabled else cfg.planner)
+        agent = brain_label(cfg, engine.agent_enabled)
         voice = {"kokoro": f"Kokoro {cfg.kokoro_voice}", "openai": "OpenAI voice", "windows": "Windows voice"}.get(cfg.voice, "silent")
         bus.emit({"type": "chips", "items": [info["wake"], info["lock"], info["stt"], voice, agent]
                   + ([f"talk: {info['ptt']}"] if info.get("ptt") else []) + (["DRY RUN"] if a.dry_run else [])})
@@ -388,30 +406,49 @@ def cmd_ui(a, cfg):
 
 def cmd_wake_train(a, cfg):
     """Train the personal "Hey Monster" detector (runs on the NPU at startup)."""
+    from . import tui
     from .tts import KokoroVoice
-    from .wake_train import build, fit, record_clips
+    from .wake_train import build, fit
     from .wakeword import Features, model_path
-    print("Training your Hey Monster wake word. Everything stays on this PC.")
-    kv = KokoroVoice(cfg.kokoro_voice, cfg.kokoro_speed, cfg.kokoro_quality).load()
+    tui.enable()
+    tui.monster(sleepy=True)
+    tui.title("Teach the monster your wake word")
+    tui.dim("Everything stays on this PC. About 3 minutes.")
+    kv = KokoroVoice(cfg.kokoro_voice, cfg.kokoro_speed, cfg.kokoro_quality, cfg.kokoro_model_path, cfg.kokoro_voices_path).load()
     feats = Features("CPU")                           # training batch runs on CPU; detection runs on the NPU
     user_pos, user_neg = [], []
     if not a.no_record:
-        print(f"\nStep 1/2: say 'Hey Monster' {a.samples} times, the way you normally would.")
-        user_pos = record_clips(a.samples, 2.0, "say: Hey Monster")
-        print("\nStep 2/2: a few seconds of normal talk and room noise (so it learns what NOT to wake on).")
-        user_neg = record_clips(3, 6.0, "talk normally for six seconds (anything except the wake phrase)")
-        user_neg += record_clips(1, 5.0, "stay quiet for five seconds")
-    print("\nBuilding the training set (a few minutes)…")
-    pos, neg = build(kv.k, feats, user_pos, user_neg)
+        rec = tui.Recorder(getattr(a, "device", None))
+        tui.say("First, a second of quiet so I know what your room sounds like…")
+        rec.calibrate(1.0)
+        tui.title(f"Say \"Hey Monster\" {a.samples} times, the way you normally would.")
+        tui.dim("Just talk. I start when you speak and stop when you pause.")
+        misses = 0
+        while len(user_pos) < a.samples and misses < 8:
+            clip = rec.take(f"{tui.dots(len(user_pos), a.samples)}  Hey Monster", max_s=3.0)
+            if clip is None:
+                misses += 1
+                tui.warn("Didn't hear anything. Speak up a little, or move closer.")
+                continue
+            user_pos.append(clip)
+            tui.ok(f"{len(user_pos)}/{a.samples}  {tui.cheer()}")
+        tui.title("Now the opposite: things that are NOT the wake word.")
+        for i in range(3):
+            tui.say(f"Talk about anything for 6 seconds ({i + 1}/3). Your day, lunch, the weather…")
+            user_neg.append(rec.timed("chatting", 6.0))
+            tui.ok("Perfect, that's not me.")
+        tui.say("Last one: stay quiet for 5 seconds.")
+        user_neg.append(rec.timed("quiet", 5.0))
+        tui.ok("Shhh. Done.")
+    tui.title("Building your wake word (a few minutes)…")
+    pos, neg = build(kv.k, feats, user_pos, user_neg, log=tui.dim)
     head, report = fit(pos, neg)
     head.save(model_path(), **report)
-    print(f"\nSaved {model_path()}")
-    print(f"  held-out recall {report['recall']:.0%}, false-wake rate per window {report['false_positive_rate']:.2%}, "
-          f"threshold {report['threshold']}")
-    print("Restart monster to use it. If it misses you, set wake_sensitivity = 0.1 in settings; "
-          "if it wakes by itself, set -0.1.")
+    tui.monster()
+    tui.ok(f"Saved. Catches {report['recall']:.0%} of held-out \"Hey Monster\"s; "
+           f"false wakes {report['false_positive_rate']:.2%} per window.")
+    tui.dim("Test it any time: monster wake-test. It takes effect the next time the monster starts.")
     return 0
-
 
 def cmd_wake_test(a, cfg):
     """Live wake-word meter: say "Hey Monster" a few times and watch the score."""
@@ -471,26 +508,85 @@ def cmd_service(a, cfg):
         from .userinfo import windows_first_name
         print(f"  at sign-in: {service.installed() or 'not installed'}")
         print(f"  running: {len(service.running())} · greeting name: {windows_first_name(cfg.user_name) or '(none)'}")
+        print(f"  brain: {brain_label(cfg)} · voice lock: {'on' if cfg.voice_lock else 'off'} · push-to-talk: {cfg.push_to_talk or 'off'}")
         from .config import config_dir
-        print(f"  log: {config_dir() / 'monster.log'}")
+        log = config_dir() / "monster.log"
+        print(f"  log: {log}")
+        if log.exists():
+            lines = log.read_text(encoding="utf-8-sig", errors="replace").splitlines()
+            start = max((i for i, l in enumerate(lines) if "background start" in l), default=0)
+            keys = ("wake word", "push-to-talk", "voice lock", "accurate speech", "error", "Error", "Traceback", "off (", "taken")
+            recent = [l for l in lines[start:] if any(k in l for k in keys)][-12:]
+            if recent:
+                print("  since the last start:")
+                for l in recent:
+                    print("    " + l.strip())
     return 0
 
 
 def cmd_voice_enroll(a, cfg):
     """Record your voiceprint so the monster only acts on you."""
-    from .voicelock import ENROLL_SENTENCES, VoiceLock
-    from .wake_train import record_clips
-    print("Voice lock: read each sentence aloud in your normal voice. Everything stays on this PC.")
+    from . import tui
+    from .config import save_setting
+    from .voicelock import ENROLL_SENTENCES, VoiceLock, print_path
+    import numpy as np
+    tui.enable()
+    tui.monster()
+    tui.title("Voice lock: so the monster only listens to you")
+    tui.dim("Read each sentence in your normal voice. It stops by itself when you finish.")
     v = VoiceLock()
-    clips = []
-    for s in ENROLL_SENTENCES:
-        clips += record_clips(1, 5.0, f'read: "{s}"')
+    rec = tui.Recorder(getattr(a, "device", None))
+    rec.calibrate(1.0)
+
+    def one(sentence, n):
+        for _ in range(3):
+            tui.say(f"{tui.P}{n}/{len(ENROLL_SENTENCES)}{tui.R}  \"{sentence}\"")
+            clip = rec.take("reading", max_s=9.0, min_speech=1.2, end_silence=0.9, wait_s=8.0)
+            if clip is not None and len(clip) > 16000 * 1.5:
+                return clip
+            tui.warn("I only caught part of that. Once more, the whole sentence.")
+        return None
+
+    clips = [one(s, i + 1) for i, s in enumerate(ENROLL_SENTENCES)]
+    if any(c is None for c in clips):
+        tui.warn("Couldn't record every sentence. Voice lock stays off. Try again: monster voice-enroll")
+        return 1
+    # re-record any take that doesn't sound like the others (a cough, a noise, a half sentence)
+    for attempt in range(2):
+        embs = [v.embed(c) for c in clips]
+        bad = []
+        for i, e in enumerate(embs):
+            rest = np.mean([x for j, x in enumerate(embs) if j != i], axis=0)
+            if float(e @ (rest / np.linalg.norm(rest))) < 0.55:
+                bad.append(i)
+        if not bad:
+            break
+        tui.warn(f"{len(bad)} take(s) didn't sound like the others. Let's redo those.")
+        for i in bad:
+            c = one(ENROLL_SENTENCES[i], i + 1)
+            if c is not None:
+                clips[i] = c
     rep = v.enroll(clips)
+    if rep["self_mean"] < 0.6:
+        tui.warn(f"Your takes didn't match each other well (score {rep['self_mean']:.2f}, noisy room?). "
+                 "Voice lock stays off so it can't lock you out. Try again somewhere quieter.")
+        save_setting("voice_lock", False)
+        print_path().unlink(missing_ok=True)
+        return 1
     p = v.save()
-    print(f"\nSaved {p}\n  your consistency {rep['self_mean']:.2f} (min {rep['self_min']:.2f}), threshold {rep['threshold']:.2f}")
-    print("Test it with: monster voice-test   (then ask someone else to try, or play a video)")
+    save_setting("voice_lock", True)
+    tui.ok(f"Voice lock on. Your consistency {rep['self_mean']:.2f}, threshold {rep['threshold']:.2f}.")
+    tui.dim(f"Saved {p}. Check it: monster voice-test. Turn it off: monster voice-lock off")
     return 0
 
+
+def cmd_voice_lock(a, cfg):
+    from .config import save_setting
+    on = a.state == "on"
+    save_setting("voice_lock", on)
+    print(f"  voice lock {'on' if on else 'off'}; it applies the next time the monster starts "
+          "(monster service stop ; monster service start)")
+    return 0
 
 def cmd_voice_test(a, cfg):
     from .voicelock import load_lock
@@ -512,12 +608,15 @@ def cmd_update(a, cfg):
     """Re-run the one-command installer: newest version, settings and models kept."""
     import subprocess
     if sys.platform == "darwin":
-        return subprocess.call(["bash", "-c", "LM_SKIP_VOICE=1 bash <(curl -fsSL " + INSTALL_URL.replace("install.ps1", "install.sh") + ")"])
+        return subprocess.call(["bash", "-c", f"LM_SKIP_VOICE=1 LM_BRAIN={cfg.planner} "
+                                f"LM_JEV={'y' if cfg.decider == 'jev' else 'n'} bash <(curl -fsSL "
+                                + INSTALL_URL.replace("install.ps1", "install.sh") + ")"])
     if os.name != "nt":
         print("update: pull the repo instead"); return 1
     print("Updating Lazy-Monster (this window will show the installer)...")
     return subprocess.call(["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command",
-                            f"$env:LM_SKIP_VOICE='1'; irm {INSTALL_URL} | iex"])
+                            f"$env:LM_SKIP_VOICE='1'; $env:LM_BRAIN='{cfg.planner}'; "
+                            f"$env:LM_JEV='{'y' if cfg.decider == 'jev' else 'n'}'; irm {INSTALL_URL} | iex"])
 
 
 def cmd_permissions(a, cfg):
@@ -542,7 +641,7 @@ def cmd_models(a, cfg):
     from .stt_refine import make_refiner
     from .tts import KokoroVoice
     t = time.perf_counter()
-    kv = KokoroVoice(cfg.kokoro_voice, cfg.kokoro_speed, cfg.kokoro_quality).load()
+    kv = KokoroVoice(cfg.kokoro_voice, cfg.kokoro_speed, cfg.kokoro_quality, cfg.kokoro_model_path, cfg.kokoro_voices_path).load()
     print(f"  voice: Kokoro-82M ({cfg.kokoro_quality}) voice {cfg.kokoro_voice} on CPU, ready in {time.perf_counter() - t:.1f} s")
     r = make_refiner(cfg, cfg.vocabulary)
     try:
@@ -716,6 +815,37 @@ def cmd_do(a, cfg):
     return 0
 
 
+VOICES = [("af_heart", "US, warm (default)"), ("af_bella", "US, bright"), ("af_nicole", "US, soft"),
+          ("af_sarah", "US, calm"), ("am_adam", "US, deep"), ("am_michael", "US, friendly"),
+          ("bf_emma", "UK, clear"), ("bm_george", "UK, classic"), ("hf_alpha", "Indian English"),
+          ("hf_beta", "Indian English, lighter"), ("hm_omega", "Indian English, male")]
+
+
+def cmd_voices(a, cfg):
+    """List voices, or hear one: monster voices --play bf_emma"""
+    from . import tui
+    from .tts import build_speaker
+    tui.enable()
+    if a.play:
+        cfg.voice, cfg.kokoro_voice = "kokoro", a.play
+        build_speaker(cfg).say("Hi, I'm your monster. This is how I sound. Say hey monster whenever you need me.")
+        tui.dim(f"Keep it: monster voices --use {a.play}")
+        return 0
+    if a.use:
+        from .config import save_setting
+        save_setting("voice", "kokoro")
+        save_setting("kokoro_voice", a.use)
+        tui.ok(f"Voice set to {a.use}. It applies the next time the monster starts.")
+        return 0
+    tui.title("Voices (all local, Kokoro-82M)")
+    for k, d in VOICES:
+        mark = f"{tui.L}\u25cf{tui.R}" if k == cfg.kokoro_voice else " "
+        print(f"  {mark} {k:<11} {d}")
+    tui.dim("Hear one: monster voices --play hf_alpha      Keep it: monster voices --use hf_alpha")
+    tui.dim("Bring your own models: see docs/VOICES.md")
+    return 0
+
+
 def cmd_say(a, cfg):
     from .tts import build_speaker
     text = " ".join(a.text) or "Hi, I'm Lazy-Monster. Tell me what to do and I'll do it, eventually."
@@ -776,13 +906,22 @@ def cmd_doctor(a, cfg):
             line(True, "moonshine-voice installed")
         except Exception as e:
             line(False, "moonshine-voice installed", str(e))
-    if cfg.planner == "openai":
-        from .secrets import get_key
-        line(bool(get_key(cfg.openai_api_key_env)), f"{cfg.openai_api_key_env} set", f"agent model {cfg.openai_model}")
-    elif cfg.planner == "jev":
-        line(bool(cfg.jev_url), "JEV_API_URL set", "Jev client is a placeholder in this build")
+    from .secrets import get_key
+    p = cfg.planner.lower()
+    if p == "openai":
+        line(bool(get_key(cfg.openai_api_key_env)), f"{cfg.openai_api_key_env} set", f"brain: OpenAI {cfg.openai_model}")
+    elif p in ("anthropic", "claude"):
+        line(bool(get_key(cfg.anthropic_api_key_env)), f"{cfg.anthropic_api_key_env} set", f"brain: Claude {cfg.anthropic_model}")
+    elif p == "jev":
+        line(False, "brain", "Jev is a decision model, not a brain: set planner to openai or anthropic, decider = jev")
     else:
         line(True, "agent disabled (planner = none)")
+    if (cfg.decider or "").lower() == "jev":
+        from .jev import build_jev
+        j = build_jev(cfg)
+        ans = j.ask("Turn the volume down please.", {"q": {"type": "noul", "instructions": "Is this a request?"}}) if j else None
+        line(bool(ans), "Jev decider (TypeSafe)", f"{cfg.jev_model}, answered in time" if ans else
+             f"{cfg.jev_api_key_env} missing or Jev unreachable (the monster works without it)")
     if os.name == "nt":
         try:
             import win32com.client  # noqa
@@ -885,6 +1024,8 @@ def main(argv=None):
     wtt = sub.add_parser("wake-test", help="live meter for the Hey Monster wake word")
     wtt.add_argument("--seconds", type=int, default=20)
     sub.add_parser("voice-enroll", help="record your voiceprint for the voice lock")
+    vl = sub.add_parser("voice-lock", help="turn the voice lock on or off")
+    vl.add_argument("state", choices=["on", "off"])
     sub.add_parser("update", help="update to the newest version (keeps your settings and models)")
     sub.add_parser("permissions", help="macOS: open the privacy settings it needs")
     vt = sub.add_parser("voice-test", help="check whether the voice lock recognises a voice")
@@ -895,6 +1036,9 @@ def main(argv=None):
     d.add_argument("task", nargs="+")
     d.add_argument("--dry-run", action="store_true")
     d.add_argument("--quiet", action="store_true", help="no spoken replies")
+    vo = sub.add_parser("voices", help="list, hear and pick the monster's voice")
+    vo.add_argument("--play", help="hear a voice, e.g. bf_emma")
+    vo.add_argument("--use", help="make a voice the default, e.g. hf_alpha")
     sy = sub.add_parser("say", help="test the monster's voice")
     sy.add_argument("text", nargs="*")
     sub.add_parser("npu", help="detect and benchmark NPU / GPU / CPU via OpenVINO")
@@ -906,7 +1050,7 @@ def main(argv=None):
     fn = {"run": cmd_run, "text": cmd_text, "bench-text": cmd_bench_text, "record": cmd_record,
           "bench-audio": cmd_bench_audio, "apps": cmd_apps, "do": cmd_do, "npu": cmd_npu, "doctor": cmd_doctor, "say": cmd_say, "ui": cmd_ui, "models": cmd_models,
           "wake-train": cmd_wake_train, "wake-test": cmd_wake_test, "service": cmd_service,
-          "voice-enroll": cmd_voice_enroll, "voice-test": cmd_voice_test, "update": cmd_update, "permissions": cmd_permissions}[a.cmd]
+          "voice-enroll": cmd_voice_enroll, "voice-lock": cmd_voice_lock, "voices": cmd_voices, "voice-test": cmd_voice_test, "update": cmd_update, "permissions": cmd_permissions}[a.cmd]
     sys.exit(fn(a, cfg) or 0)
 
 

@@ -49,6 +49,8 @@ class Engine:
         self.exit_message = "Going to sleep. Run monster again to wake me."
         self.followup_only_on_question = False        # cli: True
         self.verify: Optional[Callable[[float], bool]] = None   # voice lock: is this audio (since t) you?
+        self.jev = None                                         # optional decider: "was that meant for me?"
+        self.armed_source = "wake"                              # wake | followup
         self.trusted_until = 0.0                                # push-to-talk: skip the voice lock until then
         self.last_activity = 0.0
         # Turn-taking: the speech model splits a sentence at every pause; a turn collects
@@ -105,15 +107,17 @@ class Engine:
         if typed or self.verify is None or self.clock() < self.trusted_until:
             return True
         try:
-            ok = bool(self.verify(first_seen))
+            res = self.verify(first_seen)
         except Exception:
             return True                                         # never lock you out on an error
+        ok, score = (res if isinstance(res, tuple) else (bool(res), None))
         if not ok:
-            self.log(event="not_you")
-        return ok
+            self.log(event="not_you", score=None if score is None else round(float(score), 3))
+        return bool(ok)
 
     def wake_up(self, source: str = "npu") -> None:
         """The wake-word model heard "Hey Monster": listen for the command."""
+        self.armed_source = "wake"
         with self._lock:
             self.armed_until = self.clock() + self.armed_window
             self.last_activity = self.clock()
@@ -203,7 +207,8 @@ class Engine:
                 return
             ln.fired = True
             if self.turn is None:
-                self.turn = {"parts": [], "first": ln.first_seen, "woke": False, "typed": ln.typed}
+                self.turn = {"parts": [], "first": ln.first_seen, "woke": False, "typed": ln.typed,
+                             "source": "wake" if ln.woke else self.armed_source}
             self.turn["parts"].append(cmd)
             self.turn["woke"] = self.turn["woke"] or ln.woke
             self.turn["last"] = self.clock()
@@ -232,6 +237,15 @@ class Engine:
         if not self._is_you(t["first"], t["typed"]):
             self.feedback("unknown")
             return
+        # No wake word, just the follow-up window: was that actually meant for the monster?
+        if (self.jev is not None and not t["typed"] and not t["woke"] and t.get("source") == "followup"
+                and not (self.pending and self.clock() < self.pending_until)):
+            a = self.worker.agent
+            p = self.jev.addressed(cmd, getattr(a, "last_said", "") if a else "")
+            if p is not None and p < 0.35:
+                self.armed_until = 0.0
+                self.log(event="not_for_me", text=cmd, p=round(p, 2))
+                return
         # A one-word turn is noise, unless we are mid-conversation ("snake", "the second one").
         if not self.agent_enabled or not cmd or (len(cmd.split()) < 2 and not self.in_session()):
             self.feedback("unknown")
@@ -276,6 +290,7 @@ class Engine:
         listen = not self.followup_only_on_question or self.expects_reply()
         with self._lock:
             self.armed_until = self.clock() + self.followup_window if listen else 0.0
+            self.armed_source = "followup"
         self.feedback("ok" if ok else "error")
         if listen:
             self.feedback("followup")

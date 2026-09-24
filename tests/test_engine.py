@@ -1138,3 +1138,143 @@ def test_mac_launch_agent(tmp_path, monkeypatch):
     p = service._install_mac()
     d = plistlib.loads(open(p, "rb").read())
     assert d["Label"] == "com.lazymonster.agent" and d["RunAtLoad"] is True and "--background" in d["ProgramArguments"]
+
+
+# ---- 1.0.1: brains, voice lock feedback -----------------------------------------------------
+def test_claude_client_converts_both_ways():
+    from lazymonster.agent import ClaudeClient
+    msgs = [{"role": "system", "content": "You are the monster."},
+            {"role": "user", "content": "open notepad"},
+            {"role": "assistant", "content": "", "tool_calls": [{"id": "t1", "type": "function",
+             "function": {"name": "open_app", "arguments": '{"app": "notepad"}'}}]},
+            {"role": "tool", "tool_call_id": "t1", "content": "opened notepad"},
+            {"role": "system", "content": "You have used your step budget."}]
+    tools = [{"type": "function", "function": {"name": "open_app", "description": "Open an app",
+              "parameters": {"type": "object", "properties": {"app": {"type": "string"}}}}}]
+    body = ClaudeClient.to_anthropic(msgs, tools)
+    assert body["system"] == "You are the monster."
+    roles = [m["role"] for m in body["messages"]]
+    assert roles == ["user", "assistant", "user"]                      # strict turn-taking
+    assert body["messages"][1]["content"][0] == {"type": "tool_use", "id": "t1", "name": "open_app", "input": {"app": "notepad"}}
+    assert body["messages"][2]["content"][0]["type"] == "tool_result"
+    assert body["messages"][2]["content"][1]["text"].startswith("[note]")
+    assert body["tools"][0]["input_schema"]["properties"]["app"]["type"] == "string"
+    out = ClaudeClient.to_openai({"content": [{"type": "text", "text": "Opening it."},
+                                              {"type": "tool_use", "id": "t2", "name": "finish", "input": {"summary": "done"}}]})
+    m = out["choices"][0]["message"]
+    assert m["content"] == "Opening it." and m["tool_calls"][0]["function"]["name"] == "finish"
+    assert json.loads(m["tool_calls"][0]["function"]["arguments"]) == {"summary": "done"}
+
+
+def test_build_client_per_provider(monkeypatch):
+    from lazymonster.agent import AgentError, ChatClient, ClaudeClient, build_client
+    from lazymonster.config import Config
+    monkeypatch.setenv("OPENAI_API_KEY", "k1"); monkeypatch.setenv("ANTHROPIC_API_KEY", "k2"); monkeypatch.setenv("JEV_API_KEY", "k3")
+    cfg = Config()
+    cfg.planner = "openai"; assert type(build_client(cfg)) is ChatClient
+    cfg.planner = "anthropic"; c = build_client(cfg); assert type(c) is ClaudeClient and c.model == cfg.anthropic_model
+    assert build_client(cfg, escalation=True).model == cfg.anthropic_escalation_model
+    cfg.planner = "jev"
+    with pytest.raises(AgentError):
+        build_client(cfg)                                             # Jev decides; it doesn't write
+    cfg.planner = "none"; assert build_client(cfg) is None
+
+
+def test_voice_lock_rejection_is_explained_once_per_wake():
+    eng, ex, client, said, fb = make_agent([])
+    c, events = _conv(eng)
+    eng.feedback, eng.log = c.feedback, lambda **ev: c.log(ev)
+    eng.verify = lambda t0: (False, 0.31)
+    eng.wake_up()
+    eng.on_complete(1, "open notepad and write a poem")
+    eng.on_complete(2, "open notepad and write a poem")
+    hints = [e for e in events if e.get("type") == "say" and "didn't sound like you" in e["text"]]
+    assert len(hints) == 1
+
+
+def test_tui_meter_and_dots():
+    from lazymonster import tui
+    assert tui.dots(2, 4).count("\u25cf") == 2 and tui.dots(2, 4).count("\u25cb") == 2
+    assert "\u2588" in tui.meter(0.1)
+
+
+def test_local_whisper_folder_is_used(tmp_path):
+    from lazymonster.stt_refine import WhisperRefiner
+    r = WhisperRefiner(str(tmp_path))
+    assert r.path == tmp_path
+
+
+# ---- 1.0.2: Jev as a decider (TypeSafe System One) ----------------------------------------------
+class FakeJev:
+    def __init__(self, addressed=0.9, agreed=0.9, plan=None):
+        self._a, self._g, self._p, self.calls = addressed, agreed, plan, []
+    def addressed(self, heard, last_said=""):
+        self.calls.append(("addressed", heard)); return self._a
+    def agreed(self, q, a):
+        self.calls.append(("agreed", a)); return self._g
+    def plan(self, task, tools):
+        self.calls.append(("plan", task)); return self._p
+
+
+def test_jev_ignores_room_chatter_in_the_followup_window():
+    eng, ex, client, said, fb = make_agent([[("finish", {"summary": "Done.", "next": "Want me to save it?"})]])
+    eng.jev = FakeJev(addressed=0.1)
+    eng.on_complete(1, "hey monster write a note please")
+    before = len(client.seen)
+    eng.on_complete(2, "no mum I said I'll be down in five minutes")      # follow-up window, no wake word
+    assert len(client.seen) == before and ("addressed", "no mum I said I'll be down in five minutes") in eng.jev.calls
+
+
+def test_jev_not_asked_after_a_wake_word():
+    eng, ex, client, said, fb = make_agent([[("finish", {"summary": "ok"})]])
+    eng.jev = FakeJev(addressed=0.0)
+    eng.on_complete(1, "hey monster write a note please")
+    assert not [c for c in eng.jev.calls if c[0] == "addressed"] and client.seen
+
+
+def test_jev_plan_feeds_tree_and_starts_hard_tasks_on_the_stronger_model():
+    eng, ex, client, said, fb = make_agent([])
+    strong = ScriptedClient([[("finish", {"summary": "Built it."})]]); strong.model = "claude-sonnet-5"
+    agent = eng.worker.agent
+    agent.escalation = strong
+    agent.jev = FakeJev(plan={"candidates": [{"tool": "code_write_file", "p": 0.7}], "difficulty": 1.8})
+    logs = []
+    agent.log = lambda **k: logs.append(k)
+    agent.run("build me a full snake game with levels")
+    assert said[-1].startswith("Built it.") and client.seen == []
+    assert any(l.get("event") == "agent_think" and l.get("source") == "jev" for l in logs)
+
+
+def test_jev_understands_informal_yes():
+    import threading
+    eng, ex, client, said, fb = make_agent([[("code_run", {"project": "snake", "path": "main.py"})],
+                                            [("finish", {"summary": "ok"})]])
+    agent = eng.worker.agent
+    agent.jev = FakeJev(agreed=0.93)
+    threading.Timer(0.05, lambda: agent.hear("why not, go for it")).start()
+    agent.run("run the game")
+    assert ex.calls and ex.calls[-1].name == "code_run"
+
+
+def test_jev_http_shape(monkeypatch):
+    from lazymonster import jev
+    monkeypatch.setenv("TYPESAFE_API_KEY", "ts-key")
+    sent = {}
+    class R:
+        status_code = 200
+        def json(self): return {"answers": {"addressed": {"type": "noul", "noul": 0.12}}}
+    import requests
+    monkeypatch.setattr(requests, "post", lambda url, **k: sent.update(url=url, **k) or R())
+    j = jev.Jev()
+    assert j.addressed("pass the salt", "Want me to save it?") == 0.12
+    assert sent["url"] == "https://api.typesafe.ai/v1/systemone" and sent["json"]["model"] == "jev-latest"
+    assert sent["headers"]["Authorization"] == "Bearer ts-key" and sent["json"]["questions"]["addressed"]["type"] == "noul"
+
+
+def test_jev_down_means_business_as_usual(monkeypatch):
+    from lazymonster import jev
+    monkeypatch.setenv("TYPESAFE_API_KEY", "ts-key")
+    import requests
+    def boom(*a, **k): raise requests.exceptions.ConnectTimeout()
+    monkeypatch.setattr(requests, "post", boom)
+    assert jev.Jev().addressed("hello") is None

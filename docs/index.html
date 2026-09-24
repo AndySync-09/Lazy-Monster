@@ -422,7 +422,7 @@ footer{background:var(--ink);color:#D9D7EA;padding-block:64px 40px;position:rela
       <ul class="reqs">
         <li><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#C6F432" stroke-width="2.4" aria-hidden="true"><path d="M4 12l5 5L20 6"/></svg><div>Windows 10 or 11 with a microphone<small>Headset or laptop mic both work</small></div></li>
         <li><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#C6F432" stroke-width="2.4" aria-hidden="true"><path d="M4 12l5 5L20 6"/></svg><div>About 3 GB of free space<small>Mostly the voice models, downloaded once</small></div></li>
-        <li><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#C6F432" stroke-width="2.4" aria-hidden="true"><path d="M4 12l5 5L20 6"/></svg><div>An OpenAI API key (optional)<small>The installer asks for it; instant commands work without it</small></div></li>
+        <li><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#C6F432" stroke-width="2.4" aria-hidden="true"><path d="M4 12l5 5L20 6"/></svg><div>An OpenAI or Claude API key<small>You pick one first; instant commands work without it. Jev is optional.</small></div></li>
         <li><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#9DB8FF" stroke-width="2.4" aria-hidden="true"><circle cx="12" cy="12" r="8"/></svg><div>Intel AI PC (optional)<small>The NPU runs the wake word; without one it uses the CPU</small></div></li>
       </ul>
     </div>
@@ -432,9 +432,10 @@ footer{background:var(--ink);color:#D9D7EA;padding-block:64px 40px;position:rela
         <code id="installCmd">irm https://raw.githubusercontent.com/AndySync-09/lazy-monster/main/install.ps1 | iex</code></div>
       <div class="cmdrow" style="box-shadow:6px 6px 0 var(--lime)"><div class="top"><strong>What it does, in about 5 minutes</strong></div>
         <ol style="margin:0;padding-left:20px;display:flex;flex-direction:column;gap:6px;color:var(--body)">
+          <li>Asks which brain to use (OpenAI or Claude, plus Jev if you like) and checks your keys</li>
           <li>Finds Python, or installs it for you</li>
           <li>Installs Lazy-Monster in its own folder</li>
-          <li>Asks for your OpenAI key (optional)</li>
+          
           <li>Downloads the voice models and learns your voice</li>
           <li>Starts it at sign-in and adds it to the Start menu</li>
         </ol>
@@ -467,7 +468,9 @@ footer{background:var(--ink);color:#D9D7EA;padding-block:64px 40px;position:rela
     <div class="faq-list">
       <details><summary>Is it listening all the time?</summary><p>Only a small wake-word model listens, on your PC. Nothing is transcribed, saved or sent until you say "Hey Monster" or press Ctrl+Alt+Space.</p></details>
       <details><summary>What leaves my PC?</summary><p>Your request as text, to plan bigger tasks with the model you choose. Speech recognition and the voice stay local. Research questions go to the web search you configure.</p></details>
-      <details><summary>What does it cost?</summary><p>The app is free. Bigger tasks use your own OpenAI key, usually a few cents at most; instant commands like "mute" cost nothing.</p></details>
+      <details><summary>What does it cost?</summary><p>The app is free. Bigger tasks use your own OpenAI or Claude key, usually a few cents at most; instant commands like "mute" cost nothing.</p></details>
+      <details><summary>Which AI does it use?</summary><p>Your choice of brain: OpenAI or Claude. Add Jev by TypeSafe and it makes the split-second calls around the brain: was that meant for me, which tool, did you say yes. Speech, voice and the wake word always run on your PC.</p></details>
+      <details><summary>Can I use my own voice models?</summary><p>Yes. Pick a built-in voice with "monster voices", or point it at your own Kokoro-format voice files, your own Whisper export, and retrain the wake word on your voice. The repo's docs/VOICES.md shows how.</p></details>
       <details><summary>How do I update or remove it?</summary><p>Run the install command again, or say "monster update" in a terminal. To remove it, run uninstall.ps1 from %LOCALAPPDATA%\LazyMonster\app. It asks before deleting your voice and settings.</p></details>
       <details><summary>Do I need an NPU?</summary><p>No. With an Intel AI PC the wake word runs on the NPU and saves battery. Without one, it runs on the CPU.</p></details>
       <details><summary>Does it work on a Mac?</summary><p>Next week, for Apple Silicon and Intel Macs. Watch the GitHub repo for releases and you'll hear the moment it lands.</p></details>

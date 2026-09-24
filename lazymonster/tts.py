@@ -28,12 +28,20 @@ class KokoroVoice:
     """Kokoro-82M (Apache 2.0) via ONNX Runtime. Speaks sentence by sentence:
     the next sentence renders while the current one plays."""
 
-    def __init__(self, voice: str = "af_heart", speed: float = 1.05, quality: str = "fp32"):
+    def __init__(self, voice: str = "af_heart", speed: float = 1.05, quality: str = "fp32",
+                 model_path: str = "", voices_path: str = ""):
         self.voice, self.speed, self.quality = voice, speed, quality
+        self.model_path, self.voices_path = model_path, voices_path          # your own Kokoro-format files
         self.k = None
         self.cancel = threading.Event()
 
     def ensure(self):
+        from pathlib import Path
+        if self.model_path and self.voices_path:
+            m, v = Path(self.model_path).expanduser(), Path(self.voices_path).expanduser()
+            if not (m.is_file() and v.is_file()):
+                raise FileNotFoundError(f"kokoro_model_path / kokoro_voices_path not found: {m} / {v}")
+            return m, v
         from .models import download, models_dir
         d = models_dir() / "kokoro"
         d.mkdir(exist_ok=True)
@@ -163,7 +171,7 @@ def build_speaker(cfg, load: bool = True) -> Speaker:
     s = Speaker(cfg.voice, cfg.tts_model, cfg.tts_voice, cfg.tts_instructions,
                 cfg.openai_api_key_env, cfg.openai_base_url)
     if cfg.voice == "kokoro":
-        s.kokoro = KokoroVoice(cfg.kokoro_voice, cfg.kokoro_speed, cfg.kokoro_quality)
+        s.kokoro = KokoroVoice(cfg.kokoro_voice, cfg.kokoro_speed, cfg.kokoro_quality, cfg.kokoro_model_path, cfg.kokoro_voices_path)
         if load:
             try:
                 s.kokoro.load()
