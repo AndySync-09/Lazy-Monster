@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.0.4
+- **No more greetings out of nowhere.** The wake word now gets a second opinion before the monster wakes: Whisper re-hears the last two seconds (without its vocabulary hint, so it can't imagine the word) and must hear "monster", and with the voice lock on it must sound like you. A false wake stays completely silent (logged as `wake ignored`).
+- The detector itself is stricter: your trained threshold instead of a cap at 0.85, and three hits in a row instead of two. Tune with `wake_sensitivity`.
+- "Hi Andy, how can I help?" at most every 30 minutes; other wakes just chime.
+- `service status` / `doctor` counted one monster three times (on Windows each is a chain of launcher processes). Now it counts monsters, not processes.
+
 ## 1.0.3
 - **Fix: the background monster quit right after starting** (`running: 0`, so neither "Hey Monster" nor Ctrl+Alt+Space answered). The voice lock's speaker model (sherpa-onnx) ships its own onnxruntime DLL, and loading it into the same process as the Kokoro voice's onnxruntime crashes on Windows without a Python error. The voice lock now runs in its own small helper process and answers over a pipe; if the helper is slow or gone, it lets you through rather than locking you out.
 - Native crashes now leave a trace in the log (faulthandler), and startup logs each step (microphone, voice lock, push-to-talk, wake word), so `monster service status` shows where it stopped.

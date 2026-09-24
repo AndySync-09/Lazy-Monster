@@ -149,11 +149,11 @@ class WhisperRefiner:
                 last = e
         raise last
 
-    def _run(self, samples) -> str:
+    def _run(self, samples, prompt: bool = True) -> str:
         # Commands are short. A cap also keeps the NPU's fixed-size decoder cache from
         # overflowing when Whisper hallucinates on silence.
         kwargs = {"max_new_tokens": self.max_tokens}
-        if self._prompt_ok and self.vocab and self.prompt_words:
+        if prompt and self._prompt_ok and self.vocab and self.prompt_words:
             kwargs["initial_prompt"] = "Vocabulary: " + ", ".join(self.vocab[:self.prompt_words]) + "."
         try:
             res = self.pipe.generate(samples, **kwargs)
@@ -163,10 +163,12 @@ class WhisperRefiner:
         text = res.texts[0] if getattr(res, "texts", None) else str(res)
         return text.strip()
 
-    def transcribe(self, audio) -> str:
+    def transcribe(self, audio, prompt: bool = True) -> str:
+        """prompt=False skips the vocabulary hint: used to double-check a wake,
+        where a hint like "Lazy Monster" could make Whisper imagine the word in noise."""
         if self.pipe is None or len(audio) < 16000 * 0.3:
             return ""
-        return self._run(audio.tolist())
+        return self._run(audio.tolist(), prompt)
 
 
 _WAKE_LEAD = re.compile(r"^\W*(?:\w+\W+){0,2}?mon\w*\b[\s,.!?]*", re.I)
@@ -201,17 +203,17 @@ class MLXRefiner(WhisperRefiner):
         self.load_s = round(time.perf_counter() - t0, 1)
         return self.device
 
-    def _run(self, samples) -> str:
+    def _run(self, samples, prompt: bool = True) -> str:
         audio = np.asarray(samples, dtype=np.float32)
         kw = {"path_or_hf_repo": str(self.path), "language": "en", "condition_on_previous_text": False}
-        if self._prompt_ok and self.vocab and self.prompt_words:
+        if prompt and self._prompt_ok and self.vocab and self.prompt_words:
             kw["initial_prompt"] = "Vocabulary: " + ", ".join(self.vocab[:self.prompt_words]) + "."
         return str(self.mlx.transcribe(audio, **kw).get("text", "")).strip()
 
-    def transcribe(self, audio) -> str:
+    def transcribe(self, audio, prompt: bool = True) -> str:
         if self.mlx is None or len(audio) < 16000 * 0.3:
             return ""
-        return self._run(audio)
+        return self._run(audio, prompt)
 
 
 class FasterWhisperRefiner(WhisperRefiner):
@@ -234,18 +236,18 @@ class FasterWhisperRefiner(WhisperRefiner):
         self.load_s = round(time.perf_counter() - t0, 1)
         return self.device
 
-    def _run(self, samples) -> str:
+    def _run(self, samples, prompt: bool = True) -> str:
         audio = np.asarray(samples, dtype=np.float32)
         kw = {"language": "en", "beam_size": 1, "condition_on_previous_text": False, "vad_filter": False}
-        if self._prompt_ok and self.vocab and self.prompt_words:
+        if prompt and self._prompt_ok and self.vocab and self.prompt_words:
             kw["initial_prompt"] = "Vocabulary: " + ", ".join(self.vocab[:self.prompt_words]) + "."
         segs, _ = self.fw.transcribe(audio, **kw)
         return " ".join(s.text.strip() for s in segs).strip()
 
-    def transcribe(self, audio) -> str:
+    def transcribe(self, audio, prompt: bool = True) -> str:
         if self.fw is None or len(audio) < 16000 * 0.3:
             return ""
-        return self._run(audio)
+        return self._run(audio, prompt)
 
 
 def make_refiner(cfg, vocabulary):

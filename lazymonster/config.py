@@ -40,6 +40,7 @@ class Config:
     wake_engine: str = "auto"        # auto (NPU model if trained, plus transcript) | transcript
     wake_sensitivity: float = 0.0    # raise (e.g. 0.1) if it misses you; lower if it wakes by itself
     idle_gate: bool = True           # with the NPU wake word, pause the CPU transcriber while idle
+    wake_confirm: bool = True        # second opinion before waking: Whisper must hear "monster" (and the voice lock, you)
     turn_delay: float = 0.9          # seconds of quiet that end your turn (a pause mid-sentence is fine)
     chimes: bool = True              # three soft sounds: wake, done, error
     acks: bool = True                # say "On it" when a task starts

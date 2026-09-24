@@ -69,10 +69,10 @@ def uninstall() -> bool:
         return False
 
 
-def running() -> list:
+def _matches() -> list:
     import psutil
     out = []
-    for p in psutil.process_iter(["pid", "name", "cmdline"]):
+    for p in psutil.process_iter(["pid", "name", "cmdline", "ppid"]):
         try:
             cl = " ".join(p.info["cmdline"] or [])
         except Exception:
@@ -80,6 +80,14 @@ def running() -> list:
         if "--background" in cl and ("monsterw" in cl.lower() or "lazymonster" in cl.lower()) and p.pid != os.getpid():
             out.append(p)
     return out
+
+
+def running() -> list:
+    """One entry per monster. On Windows each one is a chain of three processes
+    (monsterw.exe -> venv pythonw -> real pythonw), so only the top of each chain counts."""
+    procs = _matches()
+    pids = {p.pid for p in procs}
+    return [p for p in procs if p.info.get("ppid") not in pids]
 
 
 def start() -> None:
@@ -96,13 +104,13 @@ def start() -> None:
 
 
 def stop() -> int:
-    procs = running()
-    for p in procs:
+    tops = running()
+    for p in _matches():                 # the whole chain, children included
         try:
             p.terminate()
         except Exception:
             pass
-    return len(procs)
+    return len(tops)
 
 
 _MUTEX = None

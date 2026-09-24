@@ -35,6 +35,9 @@ class Conversation:
         self.user_name, self.greet, self.greet_after = user_name, greet, greet_after
         self.recap = False                      # cli: welcome-back recap from the journal on first wake
         self.woke_at = 0.0
+        self.confirm_wake = None                # cli: second opinion (Whisper hears "monster", voice lock hears you)
+        self.greet_every = 1800.0               # say "Hi Andy" at most every 30 minutes; otherwise just the chime
+        self._greeted_at = -1e9
         self.listeners = []                     # callables(state) — e.g. show the window on wake
         self._lock = threading.RLock()
         self._pending_await = None
@@ -178,6 +181,10 @@ class Conversation:
             return
         if self.engine.last_partial >= self.woke_at:
             return
+        recap_due = self.recap and not getattr(self, "_recapped", False)
+        if not recap_due and self.clock() - self._greeted_at < self.greet_every:
+            return                                # woke recently: the chime is enough
+        self._greeted_at = self.clock()
         g = self.greeting()
         self.emit({"type": "say", "text": g})
         self.speaker.say(g)
@@ -192,7 +199,20 @@ class Conversation:
     def on_wake(self, score: float) -> None:
         s = self.state
         if s == SLEEPING:
-            self.engine.wake_up()
+            if self.confirm_wake is None:
+                self.engine.wake_up()
+                return
+
+            def check():                          # a false wake stays silent: no chime, no greeting, no window
+                try:
+                    ok, why = self.confirm_wake()
+                except Exception:
+                    ok, why = True, "check failed"
+                if ok and self.state == SLEEPING:
+                    self.engine.wake_up()
+                else:
+                    self.engine.log(event="wake_rejected", why=why, score=round(score, 3))
+            threading.Thread(target=check, daemon=True).start()
         elif s == SPEAKING:
             # barge-in, but never on the first moment of its own voice, and only when sure
             if self.clock() - self.spoke_at > 0.8 and score >= 0.95:

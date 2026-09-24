@@ -213,8 +213,8 @@ class Detector:
     def __init__(self, feats: Features, head: Head, on_wake: Callable[[float], None],
                  sensitivity: float = 0.0, clock=time.monotonic):
         self.stream, self.head, self.on_wake = Stream(feats), head, on_wake
-        # training picks a conservative threshold; 2 consecutive hits already guard false wakes
-        self.threshold = min(0.85, max(0.3, head.threshold)) - sensitivity
+        # the trained threshold, adjustable with wake_sensitivity; three hits in a row (240 ms)
+        self.threshold = min(0.97, max(0.5, head.threshold - sensitivity))
         self.peak = 0.0
         self.q: "collections.deque" = collections.deque(maxlen=200)
         self.clock, self.hits, self.cool_until = clock, 0, 0.0
@@ -241,7 +241,7 @@ class Detector:
                     self.peak = max(self.peak, s)
                     now = self.clock()
                     self.hits = self.hits + 1 if s >= self.threshold else 0
-                    if self.hits >= 2 and now >= self.cool_until:
+                    if self.hits >= 3 and now >= self.cool_until:
                         self.hits, self.cool_until = 0, now + 2.0
                         try:
                             self.on_wake(s)

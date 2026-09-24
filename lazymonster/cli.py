@@ -111,6 +111,8 @@ def _file_logger(cfg: Config):
             print(f"  finished in {ev['steps']} steps, {ev['s']} s" + (f" (first action after {fa} s)" if fa is not None else ""), flush=True)
         elif e == "not_you":
             print(f"  voice lock: not your voice (similarity {ev.get('score')}); ignored", flush=True)
+        elif e == "wake_rejected":
+            print(f"  wake ignored ({ev.get('why')}, score {ev.get('score')})", flush=True)
         elif e == "not_for_me":
             print(f"  ignored (Jev: not meant for me, p={ev.get('p')}): {ev.get('text')}", flush=True)
         elif e == "escalated":
@@ -144,6 +146,7 @@ def _start_voice(cfg, a, engine, apps, speaker, conv, on_partial=None, on_level=
             r.ensure()
             dev = r.load()
             engine.refine = lambda t0: r.transcribe(tap.slice(t0))
+            info["refiner"] = r
             if r.errors:
                 why = "; ".join(f"{k}: {v.splitlines()[0][:70]}" for k, v in r.errors.items())
                 status(f"(Whisper fell back from {', '.join(r.errors)}: {why})")
@@ -178,6 +181,7 @@ def _start_voice(cfg, a, engine, apps, speaker, conv, on_partial=None, on_level=
             else:
                 engine.verify = lambda t0: lock.check(tap.slice(t0))
                 info["lock"] = "voice lock on"
+                info["lock_obj"] = lock
                 status("voice lock: on (only your voice; typed requests and push-to-talk always work)")
         except Exception as e:
             status(f"voice lock off ({type(e).__name__}: {str(e)[:100]})")
@@ -196,6 +200,23 @@ def _start_voice(cfg, a, engine, apps, speaker, conv, on_partial=None, on_level=
             from .wakeword import load_detector
             det = load_detector(conv.on_wake, cfg.accelerator if cfg.accelerator != "auto" else "auto",
                                 cfg.wake_sensitivity)
+            if det is not None and cfg.wake_confirm and info.get("refiner") is not None:
+                import re as _re
+                heard_monster = _re.compile(r"mon\s?st|nster|m[ao]nst|monster|master|mobster", _re.I)
+
+                def confirm():
+                    t = tap.clock()
+                    text = info["refiner"].transcribe(tap.slice(t - 2.2, t, preroll=0), prompt=False) or ""
+                    if not heard_monster.search(text):
+                        return False, f"whisper heard {text[:40]!r}"
+                    lk = info.get("lock_obj")
+                    if lk is not None:
+                        ok, sc = lk.check(tap.slice(t - 2.2, t, preroll=0))
+                        if not ok and sc >= 0 and sc < lk.threshold - 0.15:   # short clip: be lenient
+                            return False, f"not your voice ({sc:.2f})"
+                    return True, text[:40]
+                conv.confirm_wake = confirm
+                status("wake word: double-checked by Whisper" + (" and your voice" if info.get("lock_obj") else ""))
             if det is None:
                 status("wake word: transcript only (train the NPU wake word with: monster wake-train)")
             else:

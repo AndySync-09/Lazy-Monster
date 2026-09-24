@@ -1289,3 +1289,38 @@ def test_voice_lock_helper_fails_open():
     import threading
     v.p, v.timeout, v._lock = Dead(), 0.1, threading.Lock()
     assert v.check(np.ones(16000, dtype=np.float32)) == (True, -1.0)
+
+
+def test_false_wake_stays_silent_and_real_wake_works():
+    import time as _t
+    from lazymonster import conversation as C
+    eng, *_ = make()
+    c, events = _conv(eng)
+    eng.feedback = c.feedback
+    logs = []
+    eng.log = lambda **k: logs.append(k)
+    c.confirm_wake = lambda: (False, "whisper heard 'thank you'")
+    c.on_wake(0.97); _t.sleep(0.05)
+    assert c.state == C.SLEEPING and logs[-1]["event"] == "wake_rejected"
+    c.confirm_wake = lambda: (True, "hey monster")
+    c.on_wake(0.97); _t.sleep(0.05)
+    assert c.state == C.LISTENING
+
+
+def test_greeting_only_every_so_often():
+    from lazymonster import conversation as C
+    eng, *_ = make()
+    c, events = _conv(eng, user_name="Andy")
+    eng.feedback = c.feedback
+    for _ in range(3):
+        c.set(C.SLEEPING); eng.wake_up(); eng.clock.t += 1; c._maybe_greet()
+    assert len(c.speaker.said) == 1
+
+
+def test_running_counts_one_monster_per_launcher_chain(monkeypatch):
+    from lazymonster import service
+    class P:
+        def __init__(self, pid, ppid): self.pid, self.info = pid, {"ppid": ppid}
+    chain = [P(10, 1), P(11, 10), P(12, 11)]
+    monkeypatch.setattr(service, "_matches", lambda: chain)
+    assert [p.pid for p in service.running()] == [10]
