@@ -238,7 +238,8 @@ class Api:
 def page_html() -> str:
     here = Path(__file__).parent
     font = base64.b64encode((here / "SpaceGrotesk.ttf").read_bytes()).decode()
-    return (here / "index.html").read_text(encoding="utf-8").replace("{{FONT}}", font)
+    mascot = (here / "mascot.svg").read_text(encoding="utf-8")
+    return (here / "index.html").read_text(encoding="utf-8").replace("{{FONT}}", font).replace("<!--MASCOT-->", mascot)
 
 
 W, H, OW, OH = 400, 760, 170, 180

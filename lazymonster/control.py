@@ -59,9 +59,21 @@ PING = [{"type": "function", "function": {"name": "ping", "description": "Reply 
                                           "parameters": {"type": "object", "properties": {}}}}]
 
 
-def can_drive_apps(client) -> None:
+def can_drive_apps(client, timeout: float = 30.0) -> None:
     """The monster only works with a model that answers and calls tools. Raises with the reason."""
-    data = client.chat([{"role": "user", "content": "Call the ping tool now."}], PING)
+    old = getattr(client, "timeout", None)
+    try:
+        if old is not None:
+            client.timeout = min(old, timeout)
+        data = client.chat([{"role": "user", "content": "Call the ping tool now."}], PING)
+    except Exception as e:
+        if "timed out" in str(e).lower() or "timeout" in type(e).__name__.lower():
+            raise AgentError(f"no answer in {int(timeout)} s: the model may still be loading, or the machine is short "
+                             "on memory (close other model servers)")
+        raise
+    finally:
+        if old is not None:
+            client.timeout = old
     msg = data["choices"][0]["message"]
     if not msg.get("tool_calls"):
         raise AgentError("it answered but didn't use tools, so it can't drive your apps")

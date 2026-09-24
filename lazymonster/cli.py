@@ -454,6 +454,7 @@ def cmd_ui(a, cfg):
             bus.agent = engine.worker.agent
             bus.emit(status_event(cfg, engine.agent_enabled, info, voice))
         refresh_status()
+        bus.emit({"type": "look", "style": cfg.look})
         from .settings_ctl import SettingsCtl
         api._ctl = SettingsCtl(cfg, engine, conv, speaker, bus, det_ref,
                                {"lock": info.get("lock_obj"), "verify": engine.verify}, refresh_status)

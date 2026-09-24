@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.4.0: the monster sees
+- **It no longer falls asleep mid-task.** "On it" finished, the monster checked a handful of flags, found none set at that instant, and went to sleep while the brain was still working. A running task is now an explicit state that nothing else overrides; slow tasks show "still working… 12 s".
+- **The animated mascot.** The character from the logo, drawn in SVG and animated with CSS (no particles): it breathes and floats Zs when asleep, opens its eyes and tilts its head while listening (with a glow that follows your voice), looks up with thinking dots while it decides (with the options it's weighing shown as pills), sticks its tongue out with a page while working, talks while speaking, hops when done and frowns on an error. It's the default look; "Particles" is still in settings. The README and website use a sleeping version that peeks now and then.
+- **It knows how your PC is doing.** "Why is my laptop slow?", "check my CPU usage", "what's using my memory?": CPU, memory, GPU load and shared GPU memory, disk, battery and the busiest processes, read directly (no Task Manager), with plain hints ("most of the memory is held by the GPU, often a local AI model server"). Works without a brain too, with a short spoken summary.
+- **It can see your screen, when you ask.** "What's on my screen?", "explain this error", "summarise this page": it reads the front window's text and takes a screenshot of just that window for a brain that can see (GPT, Claude, or a local vision model such as Qwen 3.5 or Gemma 4; others get the text only). The screenshot stays in memory for that one question and is never saved; private windows (passwords, keys, banking) are refused.
+- Checking a new model gives up after 30 seconds with a reason ("the model may still be loading, or the machine is short on memory") instead of waiting 3 minutes.
+
 ## 1.3.3
 - Local thinking models (Qwen3, Qwen3.5, DeepSeek-R1 in Ollama) no longer have their `<think>` reasoning spoken aloud or shown.
 

@@ -342,6 +342,15 @@ class Engine:
             self.worker.cancel()
             self.go_to_sleep(cmd)
             return
+        if intent.name == "system_status":
+            if self.agent_enabled:                       # the brain can explain what it sees
+                self.feedback("thinking")
+                self.log(event="task", text=cmd)
+                self.worker.submit_task(cmd, done=self._task_done)
+                return
+            from . import sysinfo
+            self.say(sysinfo.quick_answer(sysinfo.snapshot()))
+            return
         if intent.name in ("set_reminder", "list_reminders", "cancel_reminder", "snooze"):
             from . import reminders
             a = intent.args

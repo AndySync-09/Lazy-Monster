@@ -60,6 +60,9 @@ RULES: List[Rule] = [
     ("brain_big", _r(r"(?:use the )?(bigger|big|stronger|smarter) brain|go big|(?:use the )?(normal|regular|smaller|cheaper) brain|stop going big"),
      lambda m: {"on": "no" if (m.group(2) or "stop" in m.group(0)) else "yes"}),
     ("brain_info", _r(r"(?:what|which) (?:brain|model|ai) (?:are you using|do you use|is this|are you)|what'?s your brain"), lambda m: {}),
+    ("system_status", _r(r"(?:what(?:'s| is) (?:my )?(?:cpu|memory|ram|gpu)(?: usage| utili[sz]ation)?|(?:check |show )?(?:my )?(?:cpu|memory|ram|gpu) (?:usage|utili[sz]ation|load)|"
+                         r"how(?:'s| is) my (?:pc|laptop|computer|system)(?: doing)?|why is my (?:pc|laptop|computer) (?:slow|lagging|hot)|what(?:'s| is) using (?:my )?(?:memory|ram|cpu|gpu))"),
+     lambda m: {}),
     ("snooze", _r(r"snooze(?: (?:it|that))?(?: for (\d+) minutes?)?|remind me again(?: in (\d+) minutes?)?"),
      lambda m: {"minutes": int(m.group(1) or m.group(2) or 10)}),
     ("set_reminder", _r(r"remind me ((?:at|in) [\w: ]+?|tomorrow(?: morning| afternoon| evening| at [\w: ]+?)?|tonight(?: at [\w: ]+?)?) (?:to|about|that) (.+)"),

@@ -1,0 +1,92 @@
+<svg id="mascot" xmlns="http://www.w3.org/2000/svg" viewBox="0 -30 400 350" data-state="sleep" role="img" aria-label="Lazy-Monster">
+<defs>
+ <linearGradient id="mb" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#9579FF"/><stop offset="1" stop-color="#5B3DE0"/></linearGradient>
+ <linearGradient id="mh" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#DDFF6A"/><stop offset="1" stop-color="#9CCB12"/></linearGradient>
+ <radialGradient id="glow" cx=".5" cy=".6" r=".5"><stop offset="0" stop-color="#C6F432" stop-opacity=".55"/><stop offset="1" stop-color="#C6F432" stop-opacity="0"/></radialGradient>
+</defs>
+<style>
+ #mascot{--lvl:0;overflow:visible}
+ #mascot *{transform-box:fill-box}
+ .shadow{transform-origin:center;animation:shadow 4.8s ease-in-out infinite}
+ .body{transform-origin:50% 100%;animation:breathe 4.8s ease-in-out infinite}
+ .hornL{transform-origin:100% 100%;transform:rotate(-14deg);transition:transform .5s cubic-bezier(.3,1.6,.5,1)}
+ .hornR{transform-origin:0% 100%;transform:rotate(14deg);transition:transform .5s cubic-bezier(.3,1.6,.5,1)}
+ .tail{transform-origin:0% 50%;animation:tail 3.2s ease-in-out infinite}
+ .z{opacity:0;animation:z 3.6s ease-in infinite}.z2{animation-delay:1.2s}.z3{animation-delay:2.4s}
+ .open,.dots,.doc,.smile,.frown,.halo,.tongue{opacity:0;transition:opacity .25s}
+ .closed{transition:opacity .25s}
+ .open .lid{transform-origin:50% 50%;animation:blink 5.5s infinite}
+ .pupil{transition:transform .4s}
+ .mouth{transform-origin:50% 50%;transition:transform .2s}
+ .cheek{transition:opacity .4s}
+ .dots circle{animation:dot 1.2s ease-in-out infinite}.dots circle:nth-child(2){animation-delay:.15s}.dots circle:nth-child(3){animation-delay:.3s}
+ .doc{transform-origin:50% 100%;animation:bob 1.1s ease-in-out infinite}
+ .halo{transform-origin:center}
+ /* awake states */
+ #mascot:not([data-state=sleep]) .closed{opacity:0}
+ #mascot:not([data-state=sleep]) .open{opacity:1}
+ #mascot:not([data-state=sleep]) .z{animation:none;opacity:0}
+ #mascot:not([data-state=sleep]) .hornL{transform:rotate(0)}
+ #mascot:not([data-state=sleep]) .hornR{transform:rotate(0)}
+ #mascot:not([data-state=sleep]) .body{animation-duration:2.6s}
+ #mascot[data-state=listen] .body{animation:tilt 2.4s ease-in-out infinite}
+ #mascot[data-state=listen] .halo{opacity:calc(.35 + var(--lvl) * .65);transform:scale(calc(1 + var(--lvl) * .25))}
+ #mascot[data-state=think] .dots{opacity:1}
+ #mascot[data-state=think] .pupil{transform:translate(6px,-7px)}
+ #mascot[data-state=act] .doc,#mascot[data-state=act] .tongue{opacity:1}
+ #mascot[data-state=act] .pupil{transform:translate(4px,5px)}
+ #mascot[data-state=speak] .mouth{animation:talk .28s ease-in-out infinite alternate}
+ #mascot[data-state=ask] .pupil{transform:translate(-5px,-4px)}
+ #mascot[data-state=ask] .hornL{transform:rotate(-8deg)}
+ #mascot[data-state=done] .smile{opacity:1}#mascot[data-state=done] .mouth{opacity:0}
+ #mascot[data-state=done] .cheek{opacity:.85}
+ #mascot[data-state=done] .body{animation:hop .7s cubic-bezier(.3,1.4,.5,1) 2}
+ #mascot[data-state=error] .frown{opacity:1}#mascot[data-state=error] .mouth{opacity:0}
+ #mascot[data-state=error] .body{animation:shake .45s ease-in-out 2}
+ @keyframes breathe{0%,100%{transform:scale(1,1)}50%{transform:scale(1.025,.975)}}
+ @keyframes shadow{0%,100%{transform:scaleX(1)}50%{transform:scaleX(1.04)}}
+ @keyframes tail{0%,100%{transform:rotate(0)}50%{transform:rotate(-12deg)}}
+ @keyframes z{0%{opacity:0;transform:translate(0,10px) scale(.6)}25%{opacity:1}100%{opacity:0;transform:translate(24px,-40px) scale(1.1)}}
+ @keyframes blink{0%,94%,100%{transform:scaleY(1)}96%{transform:scaleY(.08)}}
+ @keyframes dot{0%,100%{transform:translateY(0);opacity:.5}50%{transform:translateY(-8px);opacity:1}}
+ @keyframes bob{0%,100%{transform:translateY(0) rotate(-4deg)}50%{transform:translateY(-6px) rotate(4deg)}}
+ @keyframes talk{from{transform:scale(1,.5)}to{transform:scale(1.05,1.35)}}
+ @keyframes tilt{0%,100%{transform:rotate(-3deg)}50%{transform:rotate(3deg)}}
+ @keyframes hop{0%,100%{transform:translateY(0)}40%{transform:translateY(-16px) scale(1.03,.97)}}
+ @keyframes shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-8px)}75%{transform:translateX(8px)}}
+ @media (prefers-reduced-motion:reduce){#mascot *{animation:none!important}}
+</style>
+<ellipse class="halo" cx="200" cy="190" rx="190" ry="160" fill="url(#glow)"/>
+<ellipse class="shadow" cx="200" cy="292" rx="150" ry="13" fill="#000" opacity=".22"/>
+<g class="body">
+ <path class="hornL" d="M131,104 L118,52 Q116,44 124,47 L166,90 Z" fill="url(#mh)"/>
+ <path class="hornR" d="M269,104 L282,52 Q284,44 276,47 L234,90 Z" fill="url(#mh)"/>
+ <path class="tail" d="M312,210 q30,-6 38,22" stroke="#5B3DE0" stroke-width="18" fill="none" stroke-linecap="round"/>
+ <path d="M66,262 C58,168 112,86 200,86 C288,86 342,168 334,262 Q332,284 310,284 L90,284 Q68,284 66,262 Z" fill="url(#mb)"/>
+ <path d="M92,150 C110,112 150,96 186,94" stroke="#fff" stroke-opacity=".28" stroke-width="9" fill="none" stroke-linecap="round"/>
+ <ellipse cx="200" cy="236" rx="92" ry="40" fill="#B3A2FF" opacity=".35"/>
+ <g class="closed">
+  <path d="M134,172 q22,16 44,0" stroke="#0D1117" stroke-width="8" fill="none" stroke-linecap="round"/>
+  <path d="M222,172 q22,16 44,0" stroke="#0D1117" stroke-width="8" fill="none" stroke-linecap="round"/>
+  <path d="M140,160 q16,-8 32,-2" stroke="#0D1117" stroke-opacity=".35" stroke-width="5" fill="none" stroke-linecap="round"/>
+  <path d="M228,158 q16,-6 32,2" stroke="#0D1117" stroke-opacity=".35" stroke-width="5" fill="none" stroke-linecap="round"/>
+ </g>
+ <g class="open">
+  <g class="lid"><ellipse cx="156" cy="170" rx="21" ry="23" fill="#fff"/><ellipse cx="244" cy="170" rx="21" ry="23" fill="#fff"/></g>
+  <g class="pupil"><circle cx="158" cy="174" r="10" fill="#0D1117"/><circle cx="246" cy="174" r="10" fill="#0D1117"/>
+   <circle cx="161" cy="170" r="3.5" fill="#fff"/><circle cx="249" cy="170" r="3.5" fill="#fff"/></g>
+ </g>
+ <circle class="cheek" cx="128" cy="198" r="12" fill="#FF8FB8" opacity=".45"/><circle class="cheek" cx="272" cy="198" r="12" fill="#FF8FB8" opacity=".45"/>
+ <g class="mouth"><ellipse cx="200" cy="210" rx="15" ry="11" fill="#22105E"/><ellipse cx="200" cy="214" rx="8" ry="4" fill="#FF7FA8" opacity=".8"/></g>
+ <path class="tongue" d="M206,214 q6,14 14,4" fill="#FF7FA8"/>
+ <path class="smile" d="M180,204 q20,20 40,0" stroke="#22105E" stroke-width="7" fill="none" stroke-linecap="round"/>
+ <path class="frown" d="M182,216 q18,-14 36,0" stroke="#22105E" stroke-width="7" fill="none" stroke-linecap="round"/>
+ <rect x="96" y="262" width="58" height="26" rx="13" fill="#5B3DE0"/><rect x="246" y="262" width="58" height="26" rx="13" fill="#5B3DE0"/>
+ <g class="doc"><rect x="300" y="228" width="44" height="54" rx="6" fill="#F3F1FF"/><rect x="308" y="240" width="28" height="4" rx="2" fill="#7C5CFF"/>
+  <rect x="308" y="250" width="22" height="4" rx="2" fill="#7C5CFF"/><rect x="308" y="260" width="26" height="4" rx="2" fill="#C6F432"/></g>
+</g>
+<g class="dots" fill="#C6F432"><circle cx="176" cy="38" r="8"/><circle cx="200" cy="38" r="8"/><circle cx="224" cy="38" r="8"/></g>
+<g font-family="SG,'Space Grotesk',sans-serif" font-weight="700" fill="#C6F432">
+ <text class="z" x="300" y="100" font-size="30">z</text><text class="z z2" x="326" y="70" font-size="40">z</text><text class="z z3" x="352" y="36" font-size="52">z</text>
+</g>
+</svg>

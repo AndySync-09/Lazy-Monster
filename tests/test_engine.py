@@ -1620,3 +1620,73 @@ def test_local_model_thinking_is_not_spoken(monkeypatch):
         "role": "assistant", "content": "<think>The user wants notepad. I should call open_app.</think>\nOpening it."}}]})
     c = LocalClient("http://localhost:11434/v1", "qwen3.5:9b")
     assert c.chat([])["choices"][0]["message"]["content"] == "Opening it."
+
+
+# ---- 1.4.0: awake while working, sees the PC and the screen ------------------------------------------
+def test_never_falls_asleep_during_a_task():
+    from lazymonster import conversation as C
+    eng, *_ = make_agent([])
+    c, events = _conv(eng)
+    c.log({"event": "task", "text": "build the cafe page"})
+    eng.worker.busy.set()
+    eng.armed_until = 0.0
+    c._before = C.THINKING
+    assert c._resume() == C.THINKING                   # "On it" finished: stay awake, not asleep
+    c.set(C.THINKING); c.tick()
+    assert c.state == C.THINKING
+    c.log({"event": "agent_done"}); eng.worker.busy.clear()
+    assert not c.task_active
+
+
+def test_system_status_through_the_agent(monkeypatch):
+    from lazymonster import sysinfo
+    monkeypatch.setattr(sysinfo, "snapshot", lambda top=6: {"cpu_percent": 12.0, "cpu_cores": 22, "ram_used_gb": 29.5,
+        "ram_total_gb": 31.4, "ram_percent": 94, "disk_free_gb": 200, "disk_percent": 60, "battery": None,
+        "gpu": {"gpu3d": 8, "compute": 0, "shared_gb": 20.9},
+        "top_cpu": [], "top_ram": [{"name": "llama-server", "gb": 4.0}], "at": "10:00"})
+    eng, ex, client, said, fb = make_agent([[("system_status", {})], [("finish", {"summary": "llama-server is holding the memory."})]])
+    eng.worker.agent.run("why is my laptop slow")
+    tool = [m["content"] for m in client.seen if m.get("role") == "tool"][0]
+    assert "94%" in tool and "20.9 GB" in tool and "local AI model server" in tool
+
+
+def test_look_at_screen_answers_and_refuses_private_windows():
+    eng, ex, client, said, fb = make_agent([[("look_at_screen", {"question": "explain this error"})],
+                                            [("finish", {"summary": "ok"})]])
+    seen = {}
+    client.vision = lambda q, shot: seen.update(q=q, shot=shot) or "A None value is being indexed."
+    client.model = "x"; client.base_url = "http://x"
+    eng.worker.agent.run("explain this error")
+    tool = [m["content"] for m in client.seen if m.get("role") == "tool"][0]
+    assert tool == "A None value is being indexed." and "NoneType" in seen["shot"]["text"]
+    ex.screen = {"blocked": True, "title": "[private window]"}
+    client.turns = [[("look_at_screen", {"question": "what's this"})], [("finish", {"summary": "ok"})]]
+    eng.worker.agent.run("what's on my screen")
+    tool = [m["content"] for m in client.seen if m.get("role") == "tool"][-1]
+    assert "private" in tool
+
+
+def test_model_check_gives_up_after_30s_with_a_reason():
+    import requests
+    from lazymonster.agent import AgentError
+    from lazymonster.control import can_drive_apps
+    class Slow:
+        timeout = 180.0
+        def chat(self, m, t=None):
+            assert self.timeout == 30.0
+            raise requests.exceptions.ReadTimeout("Read timed out.")
+    c = Slow()
+    with pytest.raises(AgentError) as e:
+        can_drive_apps(c)
+    assert "still be loading" in str(e.value) and c.timeout == 180.0
+
+
+def test_cpu_question_without_a_brain_gets_a_spoken_answer(monkeypatch):
+    from lazymonster import sysinfo
+    monkeypatch.setattr(sysinfo, "snapshot", lambda top=6: {"cpu_percent": 12.0, "ram_percent": 94,
+                                                            "top_ram": [{"name": "llama-server", "gb": 4.0}]})
+    eng, ex, *_ = make()
+    spoken = []
+    eng.say = spoken.append
+    eng.on_complete(1, "hey monster check my cpu usage")
+    assert spoken == ["CPU is at 12 percent and memory at 94 percent. llama-server uses the most memory. Memory is nearly full."]

@@ -37,6 +37,14 @@ body.set #settings{transform:none}
 #settings .foot{position:sticky;bottom:-20px;margin:16px -16px -20px;padding:12px 16px 16px;background:linear-gradient(transparent,#0B0F16 30%);display:flex;gap:8px;align-items:center}
 #settings .save{flex:1;border:0;border-radius:12px;padding:11px;font:inherit;font-weight:600;font-size:13px;background:var(--lime);color:#0D1117;cursor:pointer}
 #settings .save:active{transform:translateY(1px)}
+#mwrap{display:none;flex-direction:column;align-items:center;justify-content:center;width:100%;cursor:pointer;padding:6px 0}
+#mwrap svg{width:62%;max-height:250px;height:auto}
+body.svgm #c{display:none}body.svgm #mwrap{display:flex}
+body.orb #mwrap svg{width:100%;max-height:none}body.orb #cands{display:none}
+#cands{display:flex;gap:6px;flex-wrap:wrap;justify-content:center;min-height:24px;margin-top:4px}
+#cands span{font-size:11px;border:1px solid var(--line);border-radius:99px;padding:3px 9px;color:var(--muted);transition:all .3s}
+#cands span.win{border-color:#C6F432;color:#0D1117;background:#C6F432;font-weight:600}
+#cands span.lose{opacity:.35;text-decoration:line-through}
 #stateline{flex:none;height:3px;margin:6px 12px 0;border-radius:3px;background:linear-gradient(90deg,#1B2130 0%,var(--sl,#7C5CFF) 35%,#fff8 50%,var(--sl,#7C5CFF) 65%,#1B2130 100%);background-size:250% 100%;animation:slide 3.2s linear infinite;box-shadow:0 0 10px -2px var(--sl,#7C5CFF)}
 @keyframes slide{from{background-position:200% 0}to{background-position:-200% 0}}
 body[data-state=sleep]{--sl:#7C5CFF}body[data-state=listen]{--sl:#C6F432}body[data-state=speak]{--sl:#FF5FA2}
@@ -93,7 +101,8 @@ body.orb canvas{width:100%}body.orb #stage{height:100%;align-items:center}
  <div class="st lock" id="stLock" title="Voice lock"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="5" y="11" width="14" height="10" rx="2"/><path id="shackle" d="M8 11V8a4 4 0 0 1 8 0v3"/></svg></div>
  <div class="st" id="stChips" title="Chips at work"><div class="meter"><i id="mNPU" style="--c:#C6F432"></i><i id="mGPU" style="--c:#9DB8FF"></i><i id="mCPU" style="--c:#FF5FA2"></i></div></div>
 </div>
-<div id="stage"><canvas id="c" width="680" height="560" title="Click to talk"></canvas></div>
+<div id="stage"><canvas id="c" width="680" height="560" title="Click to talk"></canvas>
+<div id="mwrap" title="Click to talk"><!--MASCOT--><div id="cands"></div></div></div>
 <div id="line"></div><div id="sub"></div>
 <div id="chat"></div>
 <div id="acts"></div>
@@ -121,7 +130,10 @@ if(!list.length)return;const xs=list.length===1?[CX]:list.length===2?[200,480]:[
 tree={t:performance.now(),nodes:list.map((c,i)=>({tool:c.tool,p:Math.max(.08,c.p||.3),x:xs[i],y:i===1&&list.length===3?150:190,win:(chosen||[]).includes(c.tool),blocked:false}))};}
 function pickBranch(){if(!tree)return 0;const decided=performance.now()-tree.t>1300;const w=tree.nodes.map(n=>n.blocked?0:(decided?(n.win?1:0):n.p));const s=w.reduce((a,b)=>a+b,0)||1;let r=Math.random()*s,i=0;while(i<w.length-1&&r>w[i]){r-=w[i];i++;}return i;}
 function meters(s){const on={sleep:['mNPU'],listen:['mNPU','mCPU'],think:['mGPU'],act:['mCPU'],speak:['mCPU'],ask:['mNPU','mCPU'],done:[],error:[]}[s]||[];['mNPU','mGPU','mCPU'].forEach(id=>{const e=document.getElementById(id);if(e)e.classList.toggle('on',on.includes(id));});}
-function set(s){document.body.dataset.state=s;meters(s);if(s===st&&s!=='think')return;st=s;t0=performance.now();if(s!=='act')shownLines=0;P.forEach(p=>{p.fall=0;p.a=1;p.f=Math.random();p.b=pickBranch();});}
+function mascotState(s){const m=document.getElementById('mascot');if(m)m.setAttribute('data-state',s);if(s!=='think'){const c=document.getElementById('cands');if(c&&s!=='act')c.innerHTML='';}}
+function candPills(list,chosen){const c=document.getElementById('cands');if(!c)return;c.innerHTML='';(list||[]).slice(0,3).forEach(x=>{const e=document.createElement('span');e.textContent=x.tool+' '+Math.round((x.p||0)*100)+'%';c.appendChild(e);});
+ if(chosen&&chosen.length)setTimeout(()=>{[...c.children].forEach((e,i)=>e.className=(list[i]&&chosen.includes(list[i].tool))?'win':'lose');},900);}
+function set(s){document.body.dataset.state=s;meters(s);mascotState(s);if(s===st&&s!=='think')return;st=s;t0=performance.now();if(s!=='act')shownLines=0;P.forEach(p=>{p.fall=0;p.a=1;p.f=Math.random();p.b=pickBranch();});}
 function lbl(s,px,py,c){x.font='24px SG,sans-serif';x.textAlign='center';x.fillStyle=c;x.fillText(s,px,py);}
 function tick(now){requestAnimationFrame(tick);const e=(now-t0)/1000;
 if(st==='sleep'&&e>3){idleSkip=(idleSkip+1)%4;if(idleSkip)return;}
@@ -158,15 +170,18 @@ function send(t){t=(t||'').trim();if(!t)return;$('inp').value='';api()&&api().su
 $('go').onclick=()=>send($('inp').value);$('inp').onkeydown=e=>{if(e.key==='Enter')send($('inp').value);};
 $('close').onclick=()=>api()&&api().hide();
 document.getElementById('top').addEventListener('dblclick',e=>{e.preventDefault();e.stopPropagation();});
+document.getElementById('mwrap').onclick=()=>{if(!api())return;if(st==='speak')api().stop_talking();else api().talk();};
+document.body.classList.add('svgm');
 cv.onclick=()=>{if(!api())return;if(st==='speak')api().stop_talking();else api().talk();};cv.title='Click to talk (or stop it talking)';
 $('mini').onclick=()=>{document.body.classList.toggle('mini');api()&&api().compact(document.body.classList.contains('mini'));};
 window.lm={event(ev){switch(ev.type){
 case'state':if(ev.state==='think'&&st!=='think')tree=null;set(ev.state);if(ev.sub)sub(ev.sub);if(ev.state==='sleep'){acts([]);if(live){live.remove();live=null;}}break;
-case'level':level=ev.v;break;
+case'level':level=ev.v;{const m=document.getElementById('mascot');if(m)m.style.setProperty('--lvl',Math.min(1,ev.v*6).toFixed(2));}break;
+case'look':document.body.classList.toggle('svgm',ev.style!=='particles');break;
 case'heard':youSaid(ev.text,false);break;
 case'task':youSaid(ev.text,true);say('');acts([['Stop','',()=>api().submit('stop')]]);break;
 case'note':bubble('note',ev.text);if(live){live.remove();live=null;}break;
-case'decide':setTree(ev.candidates,ev.chosen);set('think');break;
+case'decide':setTree(ev.candidates,ev.chosen);candPills(ev.candidates,ev.chosen);set('think');break;
 case'step':if(ev.blocked&&tree){tree.nodes.forEach(n=>{if(n.tool===ev.tool)n.blocked=true;});}
 if(!ev.blocked&&ev.tool!=='list_windows'&&ev.tool!=='read_window'&&ev.tool!=='read_text'){if(st!=='act')set('act');shownLines=Math.min(LN,shownLines+2);}
 step(ev.ok,ev.tool,ev.msg);break;
@@ -207,6 +222,9 @@ say('');sub('say "Hey Monster"');
   <div class="row"><small style="flex:none">Wake word</small><input type="range" id="sSens" min="-0.2" max="0.2" step="0.05"><small id="sSensT" style="flex:none;width:70px;text-align:right"></small></div>
   <div class="row"><small style="flex:none">Push-to-talk</small><input type="text" id="sPtt"></div>
   <div class="row"><button class="pill" id="sRetrain">Retrain my voice</button></div>
+ </div>
+ <div class="sec"><b>Look</b>
+  <div class="row"><button class="pill" data-look="mascot">Mascot</button><button class="pill" data-look="particles">Particles</button></div>
  </div>
  <div class="sec"><b>Position</b>
   <div class="row"><button class="pill" data-side="left">Left corner</button><button class="pill" data-side="right">Right corner</button></div>
@@ -251,6 +269,7 @@ $('sPlay').onclick=async()=>flash('sMsg',await A().preview_voice($('sVoice').val
 $('sSens').onchange=async e=>{const v=parseFloat(e.target.value);$('sSensT').textContent=v>0?'more eager':v<0?'more strict':'balanced';flash('sMsg',await A().set_setting('wake_sensitivity',v));};
 $('sPtt').onchange=async e=>flash('sMsg',await A().set_setting('push_to_talk',e.target.value));
 $('sRetrain').onclick=async()=>flash('sMsg',await A().retrain_voice());
+document.querySelectorAll('#settings [data-look]').forEach(b=>b.onclick=async()=>{document.body.classList.toggle('svgm',b.dataset.look==='mascot');flash('sMsg',await A().set_setting('look',b.dataset.look));});
 document.querySelectorAll('#settings [data-side]').forEach(b=>b.onclick=async()=>flash('sMsg',await A().set_setting('side',b.dataset.side)));
 window.lmOpenSettings=open;
 const inp=document.getElementById('inp');if(inp){inp.addEventListener('focus',()=>A()&&A().ui_busy(true));inp.addEventListener('blur',()=>{if(!document.body.classList.contains('set'))A()&&A().ui_busy(false);});}

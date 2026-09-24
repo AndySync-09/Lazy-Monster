@@ -92,6 +92,13 @@ SCHEMA: Dict[str, Dict[str, Any]] = {
                                "instead of answering from memory; search_web only opens a browser page"},
     "go_to_sleep":    {"slots": {}, "confirm": False, "early": False, "agent": True,
                        "desc": "The user wants you to stop listening / go to sleep / be quiet now"},
+    "system_status":  {"slots": {}, "confirm": False, "early": False, "agent": True,
+                       "desc": "Read the PC's state now: CPU, memory, GPU, disk, battery and the processes using them. "
+                               "Use for 'why is my laptop slow', 'CPU usage', 'what's using my memory'"},
+    "look_at_screen": {"slots": {"question": (str, 1, 400)}, "confirm": False, "early": False, "agent": True,
+                       "desc": "Look at the window in front of the user (its text, and a screenshot if your model can "
+                               "see images) and answer the question about it: 'what's on my screen', 'explain this "
+                               "error', 'summarise this page'. Private windows (passwords, keys, banking) are refused"},
     "set_reminder":   {"slots": {"what": (str, 1, 300), "when": (str, 1, 80)}, "confirm": False, "early": False,
                        "agent": True, "desc": "Remind the user later. when: natural words like 'at 8 AM', 'in 20 minutes', "
                                               "'tomorrow at 9'. At that time you wake up and suggest next steps"},

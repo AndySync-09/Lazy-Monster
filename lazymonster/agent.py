@@ -39,6 +39,8 @@ Guidelines:
 - PDFs from Word: export_pdf. Presentations: make_presentation with a full outline (never type into PowerPoint).
 - Research, news or facts: web_research, then tell the user the answer briefly and mention it came from the web.
 - If the user wants you to stop, rest or go to sleep: go_to_sleep.
+- Questions about the PC's speed, CPU, memory or GPU: system_status, then explain in plain words and offer one fix.
+- "What's on my screen", "explain this error", "summarise this page": look_at_screen with their question.
 - Reminders: set_reminder (you'll wake up and suggest next steps at that time), list_reminders, cancel_reminder.
 - Email: draft_email opens a draft in their mail app. You never send email; say they can review and send it.
 - When you offered numbered options and the user picks one ("the first one", "draft the email"), do exactly that.
@@ -87,6 +89,9 @@ class ChatClient:
         if not self.key and key_required:
             raise AgentError(f"{api_key_env} is not set")
 
+    def vision(self, question: str, shot: dict) -> str:
+        return _chat_vision(self, question, shot)
+
     def chat(self, messages, tools=None) -> dict:
         import requests
         body = {"model": self.model, "messages": messages}
@@ -102,6 +107,30 @@ class ChatClient:
         if r.status_code != 200:
             raise AgentError(f"HTTP {r.status_code}: {r.text[:300]}")
         return r.json()
+
+
+VISION_SYSTEM = ("You are Lazy-Monster, looking at the user's screen because they asked. Answer their question about "
+                 "it in 2-5 plain spoken sentences. Don't read out private details like email addresses or numbers.")
+
+
+def _screen_text(shot: dict) -> str:
+    return (f"Window: {shot.get('title', '')} ({shot.get('app', '')})\n"
+            f"Text in the window:\n{(shot.get('text') or '(none readable)')[:6000]}")
+
+
+def _chat_vision(client, question: str, shot: dict) -> str:
+    content = [{"type": "text", "text": f"{_screen_text(shot)}\n\nQuestion: {question}"}]
+    if shot.get("image"):
+        content.append({"type": "image_url", "image_url": {"url": "data:image/jpeg;base64," + shot["image"]}})
+    msgs = [{"role": "system", "content": VISION_SYSTEM}, {"role": "user", "content": content}]
+    try:
+        data = client.chat(msgs)
+    except AgentError:
+        if not shot.get("image"):
+            raise
+        msgs[1]["content"] = content[:1]                   # this model can't take images: use the text alone
+        data = client.chat(msgs)
+    return (data["choices"][0]["message"].get("content") or "").strip()
 
 
 def _responses_text(data: dict) -> tuple:
@@ -186,6 +215,24 @@ class Agent:
                 hist = hist[1:]
             return [{"role": "system", "content": self._system()}] + hist + [{"role": "user", "content": task}]
         return [{"role": "system", "content": self._system()}, {"role": "user", "content": task}]
+
+    def _look(self, client, question: str) -> str:
+        """Read the front window (text, and a screenshot if the brain can see), answer, forget the image."""
+        cap = getattr(self.ex, "capture_screen", None)
+        if cap is None:
+            return "ERROR: looking at the screen isn't available on this system yet"
+        try:
+            shot = cap()
+        except Exception as e:
+            return f"ERROR: couldn't look at the screen ({type(e).__name__}: {e})"
+        if shot.get("blocked"):
+            return "That window looks private (passwords, keys or banking), so I didn't look at it."
+        self.log(event="looked", title=shot.get("title", "")[:80], image=bool(shot.get("image")))
+        brain = client if hasattr(client, "vision") else self.client
+        try:
+            return brain.vision(question, shot)
+        except Exception as e:
+            return f"ERROR: couldn't read it ({type(e).__name__}: {str(e)[:120]})"
 
     def suggest(self, about: str) -> list:
         """Up to three things the monster could do next, for a reminder that just went off."""
@@ -415,6 +462,16 @@ class Agent:
                         if self.on_sleep:
                             self.on_sleep()
                         return True
+                    if intent.name in ("system_status", "look_at_screen"):
+                        if intent.name == "system_status":
+                            from . import sysinfo
+                            out = sysinfo.describe(sysinfo.snapshot())
+                        else:
+                            out = self._look(client, intent.args["question"])
+                        self._tools_used.append(intent.name)
+                        self.log(event="step", n=step, of=self.max_steps, intent=intent.name, ok=True, msg=out[:160], exec_ms=0)
+                        messages.append({"role": "tool", "tool_call_id": call.get("id", ""), "content": out[:MAX_RESULT]})
+                        continue
                     if intent.name in ("set_reminder", "list_reminders", "cancel_reminder"):
                         from . import reminders
                         out = (reminders.add(intent.args["what"], intent.args["when"])[1] if intent.name == "set_reminder"
@@ -595,6 +652,15 @@ class ClaudeClient:
         body = self.to_anthropic(messages, tools)
         body.update(model=self.model, max_tokens=self.max_tokens)
         return self.to_openai(self._post(body))
+
+    def vision(self, question: str, shot: dict) -> str:
+        blocks = []
+        if shot.get("image"):
+            blocks.append({"type": "image", "source": {"type": "base64", "media_type": "image/jpeg", "data": shot["image"]}})
+        blocks.append({"type": "text", "text": f"{_screen_text(shot)}\n\nQuestion: {question}"})
+        data = self._post({"model": self.model, "max_tokens": 1024, "system": VISION_SYSTEM,
+                           "messages": [{"role": "user", "content": blocks}]})
+        return "".join(b.get("text", "") for b in data.get("content", []) if b.get("type") == "text").strip()
 
     def research(self, question: str) -> str:
         body = {"model": self.model, "max_tokens": 2048,

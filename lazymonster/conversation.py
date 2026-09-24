@@ -34,6 +34,8 @@ class Conversation:
         self.asking = False
         self.spoke_at = 0.0
         self._before = SLEEPING
+        self.task_active = False
+        self.task_started = 0.0
         self.user_name, self.greet, self.greet_after = user_name, greet, greet_after
         self.recap = False                      # cli: welcome-back recap from the journal on first wake
         self.woke_at = 0.0
@@ -79,6 +81,8 @@ class Conversation:
     def _resume(self) -> str:
         if self.asking:
             return AWAITING
+        if self.task_active:                     # a task is running: never fall asleep under it
+            return ACTING if self._before == ACTING else THINKING
         if self.engine.worker.busy.is_set():
             return ACTING if self._before == ACTING else THINKING
         if self.clock() < self.engine.armed_until:
@@ -140,6 +144,7 @@ class Conversation:
         e = ev.get("event")
         if e == "task":
             self.asking = False
+            self.task_active, self.task_started = True, self.clock()
             self.set(THINKING)
             if self.speak_acks and not str(ev.get("text", "")).lower().startswith("yes, please do that"):
                 threading.Thread(target=self.speaker.say, args=(random.choice(ACKS),), daemon=True).start()
@@ -154,6 +159,7 @@ class Conversation:
             self.set(THINKING)
         elif e in ("agent_done", "task_error"):
             self.asking = False
+            self.task_active = False
         elif e == "not_you":
             # Say so once per wake, instead of silently ignoring you if the voiceprint is off
             if self.clock() - self.woke_at < 20 and not getattr(self, "_told_not_you", False):
@@ -342,6 +348,15 @@ class Conversation:
     # ---- heartbeat ---------------------------------------------------------------------
     def tick(self) -> None:
         self.engine.poll()
+        if self.task_active:
+            if not self.engine.worker.busy.is_set() and self.clock() - self.task_started > 5:
+                self.task_active = False                 # the worker finished without telling us
+            elif self.state in (THINKING, ACTING) and self.clock() - self.task_started > 8:
+                secs = int(self.clock() - self.task_started)
+                if secs % 4 == 0 and secs != getattr(self, "_pulse", -1):
+                    self._pulse = secs                   # "still working" so a slow brain doesn't look asleep
+                    self.emit({"type": "state", "state": UI[self.state], "sub": f"still working\u2026 {secs} s"})
+            return
         if self.state in (LISTENING, AWAITING) and not self.asking and self.engine.turn is None \
                 and not self.engine.busy() and not self.speaker.speaking:
             self.set(SLEEPING)

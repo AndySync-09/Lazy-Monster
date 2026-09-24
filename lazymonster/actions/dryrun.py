@@ -24,6 +24,12 @@ class DryRunExecutor:
     def owned_items(self):
         return list(self.owned)
 
+    screen = {"title": "main.py - cafe - Visual Studio Code", "app": "Code.exe",
+              "text": "TypeError: 'NoneType' object is not subscriptable", "image": None}
+
+    def capture_screen(self):
+        return dict(self.screen)
+
     def save_item(self, o, path):
         self.saved.append((o["label"], str(path)))
         return str(path)

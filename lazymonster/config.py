@@ -53,6 +53,7 @@ class Config:
     acks: bool = True                # say "On it" when a task starts
     greet: bool = True               # "Hi Andy, how can I help?" after a bare "Hey Monster"
     user_name: str = ""              # empty = first name from your Windows account
+    look: str = "mascot"             # mascot (animated character) | particles (the classic particle monster)
     window_x: int = -1               # where you dragged the window (-1 = bottom-left corner)
     window_y: int = -1
     hide_after: float = 0.0          # background mode: hide the orb entirely after this long asleep (0 = keep the orb)

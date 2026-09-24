@@ -597,3 +597,48 @@ class WindowsExecutor:
         url = f"mailto:{quote(to or '', safe='@,')}?subject={quote(subject or '')}&body={quote((body or '')[:1800])}"
         os.startfile(url)
         return True, f"opened an email draft{' to ' + to if to else ''} titled {subject!r}; the user reviews and sends it"
+
+    # ---- looking at the screen (only when asked) ------------------------------------------
+    def capture_screen(self) -> dict:
+        """The window in front of you: its title, its text, and a screenshot of just that
+        window (kept in memory for this one question, never saved). Private windows are refused."""
+        import base64
+        import io
+        import win32con
+        import win32gui
+        from ..guards import is_sensitive
+        from . import uia
+        hwnd = win32gui.GetForegroundWindow()
+        # if you clicked the monster's own window, look at the one behind it
+        for _ in range(30):
+            t = win32gui.GetWindowText(hwnd)
+            if hwnd and win32gui.IsWindowVisible(hwnd) and t and t != "Lazy-Monster" and not win32gui.IsIconic(hwnd):
+                break
+            hwnd = win32gui.GetWindow(hwnd, win32con.GW_HWNDNEXT)
+        title = win32gui.GetWindowText(hwnd)
+        if is_sensitive(title):
+            return {"blocked": True, "title": "[private window]"}
+        proc = ""
+        try:
+            import psutil
+            import win32process
+            proc = psutil.Process(win32process.GetWindowThreadProcessId(hwnd)[1]).name()
+        except Exception:
+            pass
+        text = ""
+        try:
+            text = uia.read_document(hwnd, raw=True) or ""
+        except Exception:
+            pass
+        img = None
+        try:
+            from PIL import ImageGrab
+            l, t_, r, b = win32gui.GetWindowRect(hwnd)
+            shot = ImageGrab.grab(bbox=(l, t_, r, b), all_screens=True).convert("RGB")
+            shot.thumbnail((1400, 1400))
+            buf = io.BytesIO()
+            shot.save(buf, "JPEG", quality=80)
+            img = base64.b64encode(buf.getvalue()).decode()
+        except Exception:
+            img = None
+        return {"title": title, "app": proc or "", "text": text[:8000], "image": img}

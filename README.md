@@ -1,8 +1,9 @@
 <p align="center">
+  <img alt="The Lazy-Monster mascot, asleep, peeking now and then" src="docs/assets/brand/mascot-animated.svg" width="170"><br>
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="docs/assets/brand/logo-dark.png">
-    <source media="(prefers-color-scheme: light)" srcset="docs/assets/brand/logo-light.png">
-    <img alt="Lazy-Monster" src="docs/assets/brand/logo-dark.png" width="560">
+    <source media="(prefers-color-scheme: dark)" srcset="docs/assets/brand/wordmark-dark.png">
+    <source media="(prefers-color-scheme: light)" srcset="docs/assets/brand/wordmark-light.png">
+    <img alt="Lazy-Monster" src="docs/assets/brand/wordmark-dark.png" width="420">
   </picture>
 </p>
 

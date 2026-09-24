@@ -179,9 +179,6 @@ class PosixExecutor:
         subprocess.Popen(["open", url] if MAC else ["xdg-open", url])
         return True, f"opened an email draft titled {subject!r}; the user reviews and sends it"
 
-    def owned_items(self):
-        return []
-
     def _open_file(self, path, app=""):
         from .files import resolve_file
         f = resolve_file(path, getattr(self, "default_save_dir", ""))
@@ -269,6 +266,38 @@ class PosixExecutor:
         mac.word_save_pdf(str(pdf))
         subprocess.Popen(["open", str(pdf)])
         return True, f"saved and opened {pdf}"
+
+    def capture_screen(self) -> dict:
+        """macOS: front window title and text, plus a screenshot (deleted right after)."""
+        import base64
+        import io
+        import tempfile
+        from ..guards import is_sensitive
+        title, text, app = "", "", ""
+        if MAC:
+            from . import mac
+            app, title = mac.front()
+            if is_sensitive(title):
+                return {"blocked": True, "title": "[private window]"}
+            text = mac.focused_text()
+        img = None
+        f = os.path.join(tempfile.gettempdir(), "lazymonster-look.jpg")
+        try:
+            if MAC:
+                subprocess.run(["screencapture", "-x", "-t", "jpg", f], timeout=10)
+            if os.path.exists(f):
+                from PIL import Image
+                im = Image.open(f).convert("RGB")
+                im.thumbnail((1400, 1400))
+                buf = io.BytesIO()
+                im.save(buf, "JPEG", quality=80)
+                img = base64.b64encode(buf.getvalue()).decode()
+        finally:
+            try:
+                os.remove(f)
+            except OSError:
+                pass
+        return {"title": title, "app": app, "text": text[:8000], "image": img}
 
     def owned_items(self):
         live = []

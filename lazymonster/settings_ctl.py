@@ -89,6 +89,10 @@ class SettingsCtl:
         elif key == "side":
             self.bus.move_to(str(value))
             msg = "Moved."
+        elif key == "look":
+            c.look = "particles" if value == "particles" else "mascot"
+            save_setting("look", c.look)
+            msg = "Look changed."
         elif key == "decider":
             c.decider = "jev" if value else ""
             save_setting("decider", c.decider)
