@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 320">
+<defs>
+ <linearGradient id="mb" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#9579FF"/><stop offset="1" stop-color="#5B3DE0"/></linearGradient>
+ <linearGradient id="mh" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#DDFF6A"/><stop offset="1" stop-color="#9CCB12"/></linearGradient>
+</defs>
+<ellipse cx="200" cy="292" rx="150" ry="13" fill="#000" opacity=".22"/>
+<path d="M131,104 L118,52 Q116,44 124,47 L166,90 Z" fill="url(#mh)"/>
+<path d="M269,104 L282,52 Q284,44 276,47 L234,90 Z" fill="url(#mh)"/>
+<path d="M66,262 C58,168 112,86 200,86 C288,86 342,168 334,262 Q332,284 310,284 L90,284 Q68,284 66,262 Z" fill="url(#mb)"/>
+<path d="M92,150 C110,112 150,96 186,94" stroke="#fff" stroke-opacity=".28" stroke-width="9" fill="none" stroke-linecap="round"/>
+<ellipse cx="200" cy="236" rx="92" ry="40" fill="#B3A2FF" opacity=".35"/>
+<path d="M134,172 q22,16 44,0" stroke="#0D1117" stroke-width="8" fill="none" stroke-linecap="round"/>
+<path d="M222,172 q22,16 44,0" stroke="#0D1117" stroke-width="8" fill="none" stroke-linecap="round"/>
+<path d="M140,160 q16,-8 32,-2" stroke="#0D1117" stroke-opacity=".35" stroke-width="5" fill="none" stroke-linecap="round"/>
+<path d="M228,158 q16,-6 32,2" stroke="#0D1117" stroke-opacity=".35" stroke-width="5" fill="none" stroke-linecap="round"/>
+<circle cx="128" cy="198" r="12" fill="#FF8FB8" opacity=".45"/><circle cx="272" cy="198" r="12" fill="#FF8FB8" opacity=".45"/>
+<ellipse cx="200" cy="208" rx="15" ry="11" fill="#22105E"/>
+<ellipse cx="200" cy="212" rx="8" ry="4" fill="#FF7FA8" opacity=".8"/>
+<path d="M188,196 l5,7 l5,-7" fill="#fff" opacity=".9"/>
+<rect x="96" y="262" width="58" height="26" rx="13" fill="#5B3DE0"/><rect x="246" y="262" width="58" height="26" rx="13" fill="#5B3DE0"/>
+<path d="M312,210 q30,-6 38,22" stroke="#5B3DE0" stroke-width="18" fill="none" stroke-linecap="round"/>
+<g font-family="SG,sans-serif" font-weight="700" fill="#C6F432">
+ <text x="300" y="100" font-size="30">z</text><text x="326" y="70" font-size="40">z</text><text x="356" y="34" font-size="52">z</text>
+</g></svg>

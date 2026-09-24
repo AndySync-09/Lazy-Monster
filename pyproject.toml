@@ -1,0 +1,55 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "lazy-monster"
+version = "1.0.0"
+description = "Local-first voice control and voice agent for Windows: streaming STT, semantic endpointing, typed allowlisted tools."
+requires-python = ">=3.11"
+license = { text = "Apache-2.0" }
+dependencies = [
+  "numpy",
+  "sounddevice",
+  "requests",
+  "psutil",
+  "huggingface_hub",
+  "kokoro-onnx>=0.6",
+  "onnxruntime",
+  "sherpa-onnx>=1.12",
+  "pywebview>=5.0",
+  "pillow",
+  "python-pptx",
+  "python-docx",
+  # Windows and Linux: Moonshine streaming speech, OpenVINO (NPU/GPU)
+  "moonshine-voice>=0.1.5; sys_platform != 'darwin'",
+  "openvino>=2026.4; sys_platform != 'darwin'",
+  "openvino-genai>=2026.4; sys_platform != 'darwin'",
+  "pystray; sys_platform != 'darwin'",
+  # Windows only
+  "pywin32; platform_system == 'Windows'",
+  "pywinauto; platform_system == 'Windows'",
+  "pycaw; platform_system == 'Windows'",
+  "comtypes; platform_system == 'Windows'",
+  # macOS: Whisper via MLX on Apple Silicon, faster-whisper on Intel; hotkey and Accessibility
+  "mlx-whisper; sys_platform == 'darwin' and platform_machine == 'arm64'",
+  "faster-whisper; sys_platform == 'darwin' and platform_machine == 'x86_64'",
+  "pynput; sys_platform == 'darwin'",
+  "pyobjc-framework-ApplicationServices; sys_platform == 'darwin'",
+]
+
+[project.optional-dependencies]
+dev = ["pytest"]
+
+[project.scripts]
+lazymonster = "lazymonster.cli:main"
+monster = "lazymonster.cli:main"
+
+[project.gui-scripts]
+monsterw = "lazymonster.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["lazymonster*"]
+
+[tool.setuptools.package-data]
+lazymonster = ["data/*.csv", "ui/*.html", "ui/*.ttf", "ui/*.png"]

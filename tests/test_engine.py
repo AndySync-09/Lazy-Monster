@@ -1,0 +1,1140 @@
+import json
+
+import pytest
+
+from lazymonster.actions.dryrun import DryRunExecutor
+from lazymonster.actions.files import safe_name, unique_path
+from lazymonster.apps import AppIndex
+from lazymonster.engine import Engine
+from lazymonster.grammar import Grammar
+from lazymonster.intents import Intent, SchemaError, validate
+from lazymonster.normalize import normalize
+from lazymonster.agent import Agent, tool_specs
+from lazymonster.guards import GuardError, check_click, check_input_target, parse_keys, safe_rel_path
+from lazymonster.wake import WakeSpotter
+from lazymonster.worker import Worker
+
+
+class Clock:
+    def __init__(self): self.t = 0.0
+    def __call__(self): return self.t
+
+
+class FakeWriter:
+    def generate(self, prompt, max_words):
+        return f"STORY about {prompt}"
+
+
+def make(**kw):
+    apps = AppIndex(scan_start_menu=False)
+    ex, clock, fb = DryRunExecutor(apps), Clock(), []
+    logs = []
+    worker = Worker(ex, lambda **k: logs.append(k), synchronous=True, clock=clock)
+    eng = Engine(Grammar(apps.resolve), WakeSpotter(), worker, feedback=fb.append,
+                 clock=clock, logger=logs.append, **kw)
+    return eng, ex, clock, fb, logs
+
+
+# ---- lane 1: instant ---------------------------------------------------------
+def test_normalize_numbers_and_fillers():
+    assert normalize("Could you set the volume to Twenty-Five %, please?") == "set the volume to 25 percent"
+
+
+def test_early_fire_after_stable_partials():
+    eng, ex, *_ = make()
+    eng.on_partial(1, "Hey Monster, mute")
+    assert ex.calls == []
+    eng.on_partial(1, "Hey Monster, mute")
+    assert ex.calls == [Intent.make("mute")]
+    eng.on_complete(1, "Hey Monster, mute.")
+    assert len(ex.calls) == 1
+
+
+def test_changing_partial_resets_stability():
+    eng, ex, *_ = make()
+    eng.on_partial(1, "hey monster set volume to 20")
+    eng.on_partial(1, "hey monster set volume to 25")
+    assert ex.calls == []
+    eng.on_partial(1, "hey monster set volume to 25")
+    assert ex.calls == [Intent.make("volume_set", level=25)]
+
+
+def test_open_app_never_fires_early():
+    """'open word' is often the start of 'open word and write a story'."""
+    eng, ex, *_ = make()
+    for _ in range(5):
+        eng.on_partial(1, "hey monster open word")
+    assert ex.calls == []
+    eng.on_complete(1, "hey monster open word")
+    assert ex.calls == [Intent.make("open_app", app="word")]
+
+
+def test_compound_request_never_fires_early():
+    eng, ex, *_ = make()
+    for _ in range(5):
+        eng.on_partial(1, "hey monster mute and then")
+    assert ex.calls == []
+
+
+def test_no_wake_no_action():
+    eng, ex, *_ = make()
+    eng.on_partial(1, "mute"); eng.on_partial(1, "mute"); eng.on_complete(1, "mute")
+    eng.on_complete(2, "jeff said to open chrome")
+    assert ex.calls == []
+
+
+def test_wake_then_pause_then_command():
+    eng, ex, clock, fb, _ = make()
+    eng.on_complete(1, "Hey Monster.")
+    assert "armed" in fb
+    clock.t = 2.0
+    eng.on_complete(2, "open chrome")
+    assert ex.calls == [Intent.make("open_app", app="chrome")]
+    clock.t = 20.0
+    eng.on_complete(3, "open notepad")
+    assert len(ex.calls) == 1
+
+
+def test_destructive_needs_confirmation():
+    eng, ex, clock, fb, _ = make()
+    eng.on_complete(1, "hey monster shut down the computer")
+    assert ex.calls == [] and "confirm" in fb
+    eng.on_complete(2, "yes")
+    assert ex.calls == [Intent.make("shutdown")]
+
+
+def test_confirmation_expires_and_no_cancels():
+    eng, ex, clock, fb, _ = make()
+    eng.on_complete(1, "hey monster restart")
+    eng.on_complete(2, "no")
+    assert ex.calls == [] and fb[-1] == "cancelled"
+    eng.on_complete(3, "hey monster restart")
+    clock.t = 30.0
+    eng.on_complete(4, "yes")
+    assert ex.calls == []
+
+
+def test_unknown_without_planner():
+    eng, ex, _, fb, _ = make()
+    eng.on_complete(1, "hey monster open the pod bay doors")
+    assert ex.calls == [] and fb[-1] == "unknown"
+
+
+# ---- lane 2: agent loop -----------------------------------------------------------
+class ScriptedClient:
+    """Returns a scripted sequence of tool calls, one per chat() call."""
+    def __init__(self, turns): self.turns, self.seen = list(turns), []
+    def chat(self, messages, tools=None):
+        self.seen = list(messages)
+        calls = self.turns.pop(0)
+        if isinstance(calls, str):
+            return {"choices": [{"message": {"role": "assistant", "content": calls}}]}
+        return {"choices": [{"message": {"role": "assistant", "content": None, "tool_calls": [
+            {"id": f"c{i}", "type": "function", "function": {"name": n, "arguments": json.dumps(a)}}
+            for i, (n, a) in enumerate(calls)]}}]}
+
+
+def make_agent(turns):
+    eng, ex, clock, fb, logs = make()
+    said = []
+    client = ScriptedClient(turns)
+    eng.worker.agent = Agent(client, ex, lambda **k: logs.append(k), said.append, clock=clock)
+    eng.agent_enabled = True
+    return eng, ex, client, said, fb
+
+
+def test_agent_writes_word_story():
+    eng, ex, client, said, fb = make_agent([
+        [("word_new_document", {})],
+        [("word_insert_text", {"text": "Once upon a time, Jev Engineering..."})],
+        [("word_save", {"filename": "JevStory"})],
+        [("finish", {"summary": "Saved JevStory.docx"})]])
+    eng.on_complete(1, "hey monster open word and write a story about jev engineering and save it")
+    assert [c.name for c in ex.calls] == ["word_new_document", "word_insert_text", "word_save"]
+    assert said == ["Saved JevStory.docx"] and "ok" in fb
+
+
+def test_agent_writes_code_in_vscode():
+    eng, ex, client, said, fb = make_agent([
+        [("code_open", {"project": "snake"})],
+        [("code_write_file", {"project": "snake", "path": "snake.py", "content": "print('snake')\n"})],
+        [("finish", {"summary": "Wrote snake.py"})]])
+    eng.on_complete(1, "hey monster open vs code and write a snake game in python")
+    assert [c.name for c in ex.calls] == ["code_open", "code_write_file"]
+
+
+def test_agent_gets_errors_back_instead_of_running_bad_calls():
+    eng, ex, client, said, fb = make_agent([
+        [("run_shell", {"cmd": "format c:"}), ("volume_set", {"level": 500})],
+        [("shutdown", {})],
+        "I can't do that safely."])
+    eng.on_complete(1, "hey monster wipe my disk")
+    assert ex.calls == []
+    tool_msgs = [m for m in client.seen if m.get("role") == "tool"]
+    assert all(m["content"].startswith("ERROR") for m in tool_msgs) and len(tool_msgs) == 3
+    assert said == ["I can't do that safely."]
+
+
+def test_agent_tool_list_excludes_confirm_and_internal():
+    names = {t["function"]["name"] for t in tool_specs()}
+    assert {"shutdown", "restart", "sleep", "confirm_yes"}.isdisjoint(names)
+    assert {"code_write_file", "click", "read_window", "finish"} <= names
+
+
+def test_stop_cancels_agent():
+    eng, ex, *_ = make_agent([[("list_windows", {})]])
+    eng.on_complete(9, "hey monster stop")
+    assert eng.worker.agent.cancel.is_set()
+
+
+def test_step_limit():
+    eng, ex, client, said, fb = make_agent([[("list_windows", {})]] * 40)
+    eng.worker.agent.max_steps = 3
+    eng.on_complete(1, "hey monster do something forever")
+    assert len(ex.calls) == 3 and "step limit" in said[-1]
+
+
+# ---- guards -----------------------------------------------------------------------
+@pytest.mark.parametrize("proc", ["cmd.exe", "PowerShell.exe", "WindowsTerminal.exe", "Code.exe", "consent.exe", "KeePass.exe"])
+def test_input_blocked_for_shells_and_credentials(proc):
+    with pytest.raises(GuardError):
+        check_input_target(proc)
+
+
+def test_input_allowed_for_normal_apps():
+    check_input_target("notepad.exe"); check_input_target("WINWORD.EXE"); check_input_target("chrome.exe")
+
+
+@pytest.mark.parametrize("name", ["Delete", "Send", "Pay now", "Buy", "Uninstall", "Empty Recycle Bin", "End task", "Install"])
+def test_risky_clicks_blocked(name):
+    with pytest.raises(GuardError):
+        check_click(name, "chrome.exe")
+
+
+def test_safe_clicks_allowed():
+    check_click("Save", "WINWORD.EXE"); check_click("New tab", "chrome.exe"); check_click("Bold", "WINWORD.EXE")
+
+
+@pytest.mark.parametrize("keys", ["win+r", "win+x", "ctrl+`", "alt+f4", "shift+delete", "ctrl+alt+t", "win+e", "f12", "ctrl+ctrl+s"])
+def test_banned_keys(keys):
+    with pytest.raises(GuardError):
+        parse_keys(keys)
+
+
+def test_allowed_keys():
+    assert parse_keys("Ctrl + S") == ["ctrl", "s"]
+    assert parse_keys("enter") == ["enter"]
+    assert parse_keys("win+d") == ["win", "d"]
+
+
+@pytest.mark.parametrize("path", ["../x.py", "C:/Windows/x.py", "/etc/x.py", "a/../../b.py", "run.bat", "x.ps1", "evil.exe", "a/b.lnk"])
+def test_bad_code_paths(path):
+    with pytest.raises(GuardError):
+        safe_rel_path(path)
+
+
+def test_good_code_paths():
+    assert safe_rel_path("src\\app.py") == "src/app.py"
+    assert safe_rel_path("index.html") == "index.html"
+
+
+# ---- sandbox & schema -----------------------------------------------------------
+def test_safe_names(tmp_path):
+    assert safe_name("..\\..\\Windows\\evil.exe", (".txt", ".md"), ".txt") == "evil.exe.txt"
+    assert safe_name("My Story", (".docx",), ".docx") == "My Story.docx"
+    (tmp_path / "a.txt").write_text("x")
+    assert unique_path(tmp_path, "a.txt").name == "a (2).txt"
+
+
+def test_validate_types():
+    assert validate("volume_up", {}).name == "volume_up"
+    with pytest.raises(SchemaError):
+        validate("volume_set", {"level": True})
+    with pytest.raises(SchemaError):
+        validate("code_write_file", {"project": "p", "path": "a.py"})
+
+
+@pytest.mark.parametrize("text", ["A monster.", "Hay monster, mute", "Monster, mute", "hey monster mute", "eh monster mute"])
+def test_wake_variants(text):
+    assert WakeSpotter().split(text)[0]
+
+
+@pytest.mark.parametrize("text", ["I saw a movie about a monster", "that monster truck was loud"])
+def test_no_wake_mid_sentence_without_prefix(text):
+    assert not WakeSpotter().split(text)[0]
+
+
+def test_a_monster_then_command_line():
+    eng, ex, clock, fb, _ = make()
+    eng.on_complete(1, "A monster.")
+    clock.t = 3.0
+    eng.on_complete(2, "Open notepad")
+    assert ex.calls == [Intent.make("open_app", app="notepad")]
+
+
+def test_cancel_it_stops_agent():
+    eng, ex, *_ = make()
+    class A:
+        import threading
+        cancel = threading.Event()
+    eng.worker.agent = A()
+    eng.on_complete(1, "hey monster cancel it")
+    assert A.cancel.is_set()
+
+
+def test_followup_without_wake_uses_same_session():
+    eng, ex, client, said, fb = make_agent([
+        [("open_app", {"app": "notepad"})], [("type_text", {"text": "hello"})], [("finish", {"summary": "typed"})],
+        [("press_keys", {"keys": "ctrl+s"})], [("finish", {"summary": "saved"})]])
+    eng.on_complete(1, "hey monster open notepad and type hello")
+    assert "followup" in fb
+    eng.on_complete(2, "can you save it")                    # no wake phrase
+    assert [c.name for c in ex.calls] == ["open_app", "type_text", "press_keys"]
+    users = [m["content"] for m in client.seen if m.get("role") == "user"]
+    assert users == ["open notepad and type hello", "can you save it"]   # history carried over
+    assert said[-1] == "saved"
+
+
+def test_followup_window_expires():
+    eng, ex, client, said, fb = make_agent([[("finish", {"summary": "ok"})]])
+    eng.on_complete(1, "hey monster open notepad and type hello")
+    eng.clock.t = 100.0
+    eng.on_complete(2, "can you save it")
+    assert len(client.turns) == 0 and said == ["ok"]
+
+
+def test_click_slot_named_name_validates():
+    i = validate("click", {"name": "Save"}, source="agent", allow_refs=False)
+    assert i.name == "click" and i.args == {"name": "Save"}
+
+
+def test_agent_clicks_dialog_button():
+    eng, ex, client, said, fb = make_agent([
+        [("click", {"name": "Save", "window": "Notepad"})], [("finish", {"summary": "saved"})]])
+    eng.on_complete(1, "hey monster save it")
+    assert ex.calls == [Intent.make("click", source="agent", name="Save", window="Notepad")]
+
+
+def test_close_app_resolves_display_name():
+    apps = AppIndex(scan_start_menu=False)
+    assert apps.resolve("Notepad") == "notepad"
+
+
+@pytest.mark.parametrize("text", ["hey monster sleep", "hey monster exit", "hey monster go to sleep", "hey monster goodnight"])
+def test_sleep_exits(text):
+    exited = []
+    eng, ex, *_ = make(on_exit=lambda: exited.append(1))
+    eng.on_complete(1, text)
+    assert exited == [1] and ex.calls == []
+
+
+def test_pc_sleep_needs_explicit_words_and_confirmation():
+    eng, ex, clock, fb, _ = make()
+    eng.on_complete(1, "hey monster put the computer to sleep")
+    assert "confirm" in fb and ex.calls == []
+
+
+def test_ask_user_waits_for_spoken_answer():
+    import threading
+    eng, ex, client, said, fb = make_agent([
+        [("ask_user", {"question": "Save or don't save?"})],
+        [("click", {"name": "Save"})], [("finish", {"summary": "saved"})]])
+    agent = eng.worker.agent
+    threading.Timer(0.05, lambda: agent.hear("save it")).start()
+    assert agent.run("close notepad")
+    assert said[0] == "Save or don't save?" and ex.calls == [Intent.make("click", source="agent", name="Save")]
+    tool_results = [m["content"] for m in client.seen if m.get("role") == "tool"]
+    assert tool_results[0] == "The user answered: save it"
+
+
+def test_speech_during_task_goes_to_agent():
+    eng, ex, client, said, fb = make_agent([[("finish", {"summary": "x"})]])
+    eng.worker.busy.set()
+    eng.on_complete(5, "save it")
+    assert eng.worker.agent.inbox.get_nowait() == "save it"
+    eng.worker.busy.clear()
+
+
+# ---- 0.3.0: interactive + ownership --------------------------------------------------
+from lazymonster.guards import check_type_target, is_editing, is_sensitive, owns, redact_title
+
+
+def test_recovery_codes_window_is_sensitive():
+    t = "*PyPI-Recovery-Codes-memforkdb-2026-09-21T04_11_16.998482.txt - Notepad"
+    assert is_sensitive(t) and redact_title(t) == "[sensitive window]"
+    with pytest.raises(GuardError):
+        check_type_target(t, "open notepad and type hello")
+
+
+@pytest.mark.parametrize("title", ["Untitled - Notepad", "*Untitled - Notepad", "Document1 - Word", "New Tab - Google Chrome"])
+def test_new_documents_are_owned(title):
+    check_type_target(title, "type hello")
+
+
+def test_existing_document_needs_to_be_named():
+    with pytest.raises(GuardError):
+        check_type_target("meeting notes.txt - Notepad", "open notepad and type hello")
+    check_type_target("meeting notes.txt - Notepad", "add a line to my meeting notes")
+
+
+def test_editing_keys_classified():
+    assert is_editing(["enter"]) and is_editing(["ctrl", "v"]) and is_editing(["a"])
+    assert not is_editing(["ctrl", "n"]) and not is_editing(["ctrl", "s"]) and not is_editing(["tab"])
+
+
+def test_finish_speaks_summary_and_offer_then_yes_runs_it():
+    eng, ex, client, said, fb = make_agent([
+        [("type_text", {"text": "hello"})],
+        [("finish", {"summary": "Typed hello.", "next": "Want me to save it?"})],
+        [("press_keys", {"keys": "ctrl+s"})], [("finish", {"summary": "Saved."})]])
+    eng.on_complete(1, "hey monster open notepad and type hello")
+    assert said[-1] == "Typed hello. Want me to save it?"
+    eng.on_complete(2, "yes")                                  # in the follow-up window
+    assert ex.calls[-1].name == "press_keys" and said[-1] == "Saved."
+
+
+def test_no_to_offer_moves_on():
+    eng, ex, client, said, fb = make_agent([[("finish", {"summary": "Done.", "next": "Want me to save it?"})]])
+    eng.on_complete(1, "hey monster make me a haiku")
+    eng.say = said.append
+    eng.on_complete(2, "no")
+    assert said[-1] == "Okay. What next?" and eng.worker.agent.suggestion == ""
+
+
+def test_two_failures_force_a_question():
+    class Failing(DryRunExecutor):
+        def run(self, intent):
+            self.calls.append(intent)
+            return False, "nope", None
+    eng, ex, client, said, fb = make_agent([[("list_windows", {})], [("list_windows", {})],
+                                            [("finish", {"summary": "x"})]])
+    eng.worker.agent.ex = Failing()
+    eng.on_complete(1, "hey monster do the thing")
+    tool = [m["content"] for m in client.seen if m.get("role") == "tool"]
+    assert "ask_user" in tool[1]
+
+
+def test_long_command_after_wake_counts_from_line_start():
+    eng, ex, client, said, fb = make_agent([[("finish", {"summary": "ok"})]])
+    eng.on_complete(1, "Hey monster")                 # armed until t=8
+    eng.clock.t = 3.0
+    eng.on_partial(2, "Open notepad and")             # line starts inside the window
+    eng.clock.t = 12.0                                # ...and finishes after it
+    eng.on_complete(2, "Open notepad and write a haiku about bangalore traffic")
+    assert "thinking" in fb and said == ["ok"]
+
+
+@pytest.mark.parametrize("text", ["You monster.", "Me monster.", "Here, monster."])
+def test_more_wake_mishearings(text):
+    assert WakeSpotter().split(text)[0]
+
+
+def test_weak_prefix_mid_sentence_does_not_wake():
+    assert not WakeSpotter().split("I told you monster trucks are loud")[0]
+
+
+# ---- 0.4.0 ---------------------------------------------------------------------------
+from lazymonster.textops import paste_lines, verify, parse_candidates, sentences
+from lazymonster.stt_refine import strip_wake_lead
+
+
+def test_refined_transcript_replaces_fast_one():
+    eng, ex, client, said, fb = make_agent([[("finish", {"summary": "ok"})]])
+    eng.refine = lambda t0: "Hey Monster, open Notepad and write a haiku about Bangalore traffic."
+    eng.refine_async = False
+    logs = []
+    eng.logger = logs.append
+    eng.on_complete(1, "A monster open notepad and write a haiku about value traffic")
+    users = [m["content"] for m in client.seen if m.get("role") == "user"]
+    assert users == ["open Notepad and write a haiku about Bangalore traffic."]
+    assert any('"refined"' in l for l in logs)
+
+
+def test_refine_failure_falls_back_to_fast_text():
+    eng, ex, client, said, fb = make_agent([[("finish", {"summary": "ok"})]])
+    def boom(t0): raise RuntimeError("npu busy")
+    eng.refine, eng.refine_async = boom, False
+    eng.on_complete(1, "hey monster open notepad and write a haiku")
+    assert [m["content"] for m in client.seen if m.get("role") == "user"] == ["open notepad and write a haiku"]
+
+
+def test_strip_wake_lead_variants():
+    assert strip_wake_lead("Hey, Monster. Open Word") == "Open Word"
+    assert strip_wake_lead("A monster open notepad") == "open notepad"
+    assert strip_wake_lead("open notepad") == "open notepad"
+
+
+def test_paste_lines_and_verify():
+    assert paste_lines("a\r\nb\n\nc") == ["a", "b", "", "c"]
+    ok, _ = verify("Bangalore roads sigh\nHorns bloom", "bangalore roads sigh horns bloom\r\n")
+    assert ok
+    ok, msg = verify("Bangalore roads sigh", "Bangalore sssssssssssss")
+    assert not ok and "MISMATCH" in msg
+
+
+def test_candidates_parsing():
+    c = parse_candidates('thinking {"candidates":[{"tool":"write_in_app","p":0.8},{"tool":"open_app","p":"0.2"}]}')
+    assert c == [{"tool": "write_in_app", "p": 0.8}, {"tool": "open_app", "p": 0.2}]
+    assert parse_candidates(None) == [] and parse_candidates("no json here") == []
+
+
+def test_agent_logs_candidates_and_hides_them_from_speech():
+    class C(ScriptedClient):
+        def chat(self, messages, tools=None):
+            r = super().chat(messages, tools)
+            m = r["choices"][0]["message"]
+            if m.get("tool_calls"):
+                m["content"] = '{"candidates":[{"tool":"write_in_app","p":0.9}]}'
+            return r
+    eng, ex, client, said, fb = make_agent([])
+    logs = []
+    eng.worker.agent.client = C([[("write_in_app", {"app": "notepad", "text": "hi"})], "All done."])
+    eng.worker.agent.log = lambda **k: logs.append(k)
+    eng.on_complete(1, "hey monster write hi in notepad please")
+    thinks = [l for l in logs if l.get("event") == "agent_think"]
+    assert thinks[0]["candidates"][0]["tool"] == "write_in_app" and thinks[0]["chosen"] == ["write_in_app"]
+    assert said == ["All done."]
+
+
+def test_sentences_split_for_streaming_speech():
+    assert sentences("Done. Want me to save it? Sure!") == ["Done.", "Want me to save it?", "Sure!"]
+
+
+def test_ui_bus_maps_engine_signals_to_page_events():
+    import json as _j
+    from lazymonster.ui.app import UIBus
+    bus = UIBus()
+    sent = []
+    bus._send = sent.append
+    bus.ready.set()
+    bus.feedback("armed")
+    bus.log(_j.dumps({"event": "agent_think", "candidates": [{"tool": "write_in_app", "p": .8}], "chosen": ["write_in_app"]}))
+    bus.log(_j.dumps({"event": "step", "intent": "type_text", "ok": False, "msg": "{} -> GuardError: sensitive"}))
+    bus.feedback("ok")
+    kinds = [e["type"] for e in sent]
+    assert kinds == ["decide", "step", "done"]              # screen state now comes from conversation.py
+    assert sent[1]["blocked"] is True and sent[0]["chosen"] == ["write_in_app"]
+
+
+def test_typed_text_skips_audio_refine():
+    eng, ex, client, said, fb = make_agent([[("finish", {"summary": "ok"})]])
+    eng.refine = lambda t0: (_ for _ in ()).throw(AssertionError("should not re-hear typed text"))
+    eng.refine_async = False
+    eng.handle_text("open notepad and write a haiku")
+    assert [m["content"] for m in client.seen if m.get("role") == "user"] == ["open notepad and write a haiku"]
+
+
+def test_ui_api_exposes_only_three_methods():
+    from lazymonster.ui.app import Api
+    api = Api(engine=object(), stop=None, bus=None)
+    assert [n for n in dir(api) if not n.startswith("_")] == ["compact", "hide", "sleep", "stop_talking", "submit", "talk"]
+
+
+# ---- 0.5.0 ---------------------------------------------------------------------------
+def test_wake_arms_listening_window():
+    eng, ex, clock, fb, logs = make()
+    eng.wake_up()
+    assert "armed" in fb
+    clock.t = 3.0
+    eng.on_complete(5, "open notepad")                   # no wake phrase needed after the NPU wake
+    assert ex.calls == [Intent.make("open_app", app="notepad")]
+
+
+def test_engine_busy_reflects_activity():
+    eng, ex, clock, fb, logs = make()
+    clock.t = 100.0
+    assert not eng.busy()
+    eng.wake_up()
+    assert eng.busy()
+
+
+def test_mic_gate_reasons():
+    from lazymonster.stt import MicGate
+    class Mic:
+        muted = None
+        def mute(self, m): Mic.muted = m
+    g = MicGate(); g.mic = Mic()
+    g.set("idle", True); assert Mic.muted is True
+    g.set("speaking", True); g.set("idle", False); assert Mic.muted is True
+    g.set("speaking", False); assert Mic.muted is False
+
+
+def test_settings_roundtrip(tmp_path, monkeypatch):
+    monkeypatch.setenv("APPDATA", str(tmp_path))
+    from lazymonster.config import Config, save_setting
+    save_setting("kokoro_voice", "bf_emma")
+    save_setting("wake_sensitivity", 0.1)
+    cfg = Config.load(str(tmp_path / "nope.toml"))
+    assert cfg.kokoro_voice == "bf_emma" and cfg.wake_sensitivity == 0.1
+
+
+def test_wake_head_learns_and_picks_threshold():
+    import numpy as np
+    from lazymonster.wakeword import pick_threshold, train_head
+    rng = np.random.default_rng(0)
+    pos = rng.normal(1.0, 1.0, (60, 16, 96)).astype("float32")
+    neg = rng.normal(-1.0, 1.0, (400, 16, 96)).astype("float32")
+    head = train_head(pos[:40], neg[:300])
+    rep = pick_threshold(head, pos[40:], neg[300:])
+    assert rep["recall"] >= 0.95 and rep["false_positive_rate"] <= 0.01 and 0.5 <= rep["threshold"] <= 0.95
+
+
+def test_speaker_interrupt_sets_cancel():
+    from lazymonster.tts import KokoroVoice, Speaker
+    s = Speaker("off")
+    s.kokoro = KokoroVoice()
+    s.interrupt()
+    assert s.kokoro.cancel.is_set()
+
+
+# ---- 0.5.1: running code ------------------------------------------------------------
+def test_code_run_needs_spoken_yes():
+    import threading
+    eng, ex, client, said, fb = make_agent([
+        [("code_run", {"project": "snake", "path": "main.py"})], [("finish", {"summary": "running"})]])
+    agent = eng.worker.agent
+    threading.Timer(0.05, lambda: agent.hear("yes please")).start()
+    agent.run("run the game")
+    assert said[0] == "Run main.py from snake now?" and ex.calls[-1].name == "code_run"
+
+
+def test_code_run_refused_without_yes():
+    import threading
+    eng, ex, client, said, fb = make_agent([
+        [("code_install", {"project": "snake", "packages": "pygame"})], [("finish", {"summary": "ok"})]])
+    agent = eng.worker.agent
+    threading.Timer(0.05, lambda: agent.hear("no, not now")).start()
+    agent.run("install pygame")
+    assert ex.calls == []
+    tool = [m["content"] for m in client.seen if m.get("role") == "tool"]
+    assert "did not approve" in tool[0]
+
+
+@pytest.mark.parametrize("spec", ["pygame", "numpy==2.1.0", "requests[socks]", "pygame numpy"])
+def test_safe_packages_ok(spec):
+    from lazymonster.guards import safe_packages
+    assert safe_packages(spec)
+
+
+@pytest.mark.parametrize("spec", ["--index-url http://evil x", "git+https://x/y", "../local", "-e .", "a;b", ""])
+def test_safe_packages_rejects(spec):
+    from lazymonster.guards import safe_packages
+    with pytest.raises(GuardError):
+        safe_packages(spec)
+
+
+def test_code_run_only_runs_files_it_wrote(tmp_path, monkeypatch):
+    import lazymonster.actions.code as code
+    monkeypatch.setattr(code, "code_root", lambda: tmp_path)
+    monkeypatch.setattr(code.CodeWorkspace, "_launch", lambda self, *a: None)
+    monkeypatch.setattr(code, "project_python", lambda folder: __import__("sys").executable)
+    monkeypatch.setattr(code.time, "sleep", lambda s: None)
+    ws = code.CodeWorkspace(stream_delay=0)
+    ws.opened.add(str(tmp_path / "demo"))
+    ws.write("demo", "main.py", "print('hi')\n")
+    ok, msg = ws.run("demo", "main.py", wait=1.0)
+    assert ok, msg
+    (tmp_path / "demo" / "main.py").write_text("import os; os.remove('x')\n")      # tampered
+    with pytest.raises(GuardError):
+        ws.run("demo", "main.py")
+    (tmp_path / "demo" / "other.py").write_text("print(1)\n")                     # not written by the monster
+    with pytest.raises(GuardError):
+        ws.run("demo", "other.py")
+
+
+def test_npu_friendly_rewrite_is_exact():
+    import numpy as np
+    import openvino as ov
+    import openvino.opset13 as ops
+    from lazymonster.wakeword import npu_friendly
+    x = ops.parameter([1, 64], np.float32, name="x")
+    y = ops.parameter([1, 64], np.float32, name="y")
+    out = ops.minimum(ops.maximum(ops.maximum(x, ops.constant(np.float32(1e-10))), y), ops.constant(np.float32(np.inf)))
+    m = ov.Model([out], [x, y], "t")
+    ref = ov.Core().compile_model(m.clone(), "CPU")
+    new = npu_friendly(m)
+    assert not [o for o in new.get_ops() if o.get_type_name() in ("Maximum", "Minimum")]
+    got = ov.Core().compile_model(new, "CPU")
+    a, b = np.random.randn(1, 64).astype(np.float32), np.random.randn(1, 64).astype(np.float32)
+    assert np.allclose(list(ref([a, b]).values())[0], list(got([a, b]).values())[0], rtol=1e-6, atol=1e-6)
+
+
+def test_whisper_warmup_shrinks_prompt_until_it_fits():
+    from lazymonster.stt_refine import WhisperRefiner
+    r = WhisperRefiner(vocabulary=["Koramangala"] * 5)
+    seen = []
+
+    class Pipe:
+        def generate(self, samples, **kw):
+            words = len(kw["initial_prompt"].split(",")) if "initial_prompt" in kw else 0
+            seen.append(words)
+            assert kw.get("max_new_tokens") == 96
+            if words > 12:
+                raise RuntimeError("Check '*roi_end <= *max_dim' failed")
+            class R: texts = ["ok"]
+            return R()
+    r.pipe = Pipe()
+    r._warm()
+    assert r.prompt_words == 12 and seen[0] > 12
+
+
+# ---- 0.6.0: conversation ------------------------------------------------------------
+def test_turn_joins_lines_split_by_pauses():
+    eng, ex, client, said, fb = make_agent([[("finish", {"summary": "ok"})]])
+    eng.turn_delay = 0.9
+    eng.on_complete(1, "Hey Monster.")                      # wake, pause
+    eng.clock.t = 1.0
+    eng.on_complete(2, "Open.")                             # "Open." alone would have been rejected
+    eng.clock.t = 1.5
+    eng.on_complete(3, "a snake game in Visual Studio.")
+    eng.poll()
+    assert client.seen == []                                # still inside the turn
+    eng.clock.t = 2.6
+    eng.poll()
+    users = [m["content"] for m in client.seen if m.get("role") == "user"]
+    assert users == ["Open. a snake game in Visual Studio."]
+
+
+def test_instant_command_across_a_pause():
+    eng, ex, *_ = make_agent([])
+    eng.turn_delay = 0.9
+    eng.on_complete(1, "Hey Monster, open")
+    eng.clock.t = 0.5
+    eng.on_complete(2, "notepad")
+    assert ex.calls == [Intent.make("open_app", app="notepad")]
+
+
+def test_one_word_answer_goes_to_agent_mid_conversation():
+    eng, ex, client, said, fb = make_agent([
+        [("finish", {"summary": "What game?", "next": ""})], [("finish", {"summary": "Snake it is."})]])
+    eng.on_complete(1, "hey monster make me a game")
+    eng.on_complete(2, "Snake.")                            # follow-up window, one word
+    assert said[-1].startswith("Snake it is.")
+
+
+def test_one_word_noise_ignored_when_idle():
+    eng, ex, client, said, fb = make_agent([[("finish", {"summary": "x"})]])
+    eng.clock.t = 500.0
+    eng.handle_text  # noqa
+    eng.always_listen = True
+    eng.on_complete(1, "Hmm.")
+    assert client.seen == [] and fb[-1] == "unknown"
+
+
+class _Spk:
+    speaking = False
+    def __init__(self): self.said, self.stopped = [], 0
+    def say(self, t): self.said.append(t)
+    def interrupt(self): self.stopped += 1
+
+
+def _conv(eng, **kw):
+    from lazymonster.conversation import Conversation
+    from lazymonster.stt import MicGate
+    events = []
+    c = Conversation(eng, _Spk(), MicGate(), emit=events.append, chimes=False, speak_acks=False, clock=eng.clock, **kw)
+    return c, events
+
+
+def test_conversation_wake_rules():
+    from lazymonster import conversation as C
+    eng, ex, *_ = make()
+    c, events = _conv(eng)
+    eng.feedback = c.feedback
+    c.on_wake(0.99)
+    assert c.state == C.LISTENING
+    c.on_wake(0.99)                                         # already listening: nothing, no re-arm spam
+    assert [e["state"] for e in events if e["type"] == "state"] == ["listen"]
+    c.set(C.SPEAKING); c.spoke_at = eng.clock.t
+    c.on_wake(0.99)                                         # its own first words: ignored
+    assert c.speaker.stopped == 0
+    eng.clock.t += 2
+    c.on_wake(0.96)                                         # real barge-in
+    assert c.speaker.stopped == 1 and c.state == C.LISTENING
+
+
+def test_conversation_mic_gate_follows_state():
+    from lazymonster import conversation as C
+    eng, *_ = make()
+    c, _ = _conv(eng, wake_model=True)
+    assert c.gate.has("idle")                               # sleeping: NPU listens, CPU transcriber paused
+    c.set(C.LISTENING)
+    assert not c.gate.has("idle")
+
+
+def test_vs_code_title_not_sensitive():
+    from lazymonster.guards import is_sensitive
+    assert not is_sensitive("main.py - snake_game - Visual Studio Code")
+    assert is_sensitive("PyPI-Recovery-Codes.txt - Notepad") and is_sensitive("github 2fa codes.txt")
+
+
+def test_project_venvs_live_outside_onedrive(tmp_path, monkeypatch):
+    monkeypatch.setenv("LOCALAPPDATA", str(tmp_path))
+    from lazymonster.actions.code import venv_dir
+    from pathlib import Path
+    assert str(venv_dir(Path("C:/Users/x/OneDrive/Documents/LazyMonster/code/snake"))).startswith(str(tmp_path))
+
+
+# ---- 0.7.0: background + greeting -------------------------------------------------------
+@pytest.mark.parametrize("display,user,expected", [
+    ("Annatam Dey", "andy0", "Annatam"), ("", "andy0", "Andy"), ("", "andy.dey", "Andy"),
+    ("CORP\\\\jsmith", "", "Jsmith"), ("", "", ""), ("priya@outlook.com", "", "Priya")])
+def test_first_name(display, user, expected):
+    from lazymonster.userinfo import first_name
+    assert first_name(display, user) == expected
+
+
+def test_greets_after_a_bare_wake_but_not_over_you():
+    from lazymonster import conversation as C
+    eng, *_ = make()
+    c, events = _conv(eng, user_name="Andy")
+    eng.feedback = c.feedback
+    c.greet = False                                          # drive the greeting by hand (no timers in tests)
+    eng.wake_up()
+    eng.clock.t += 0.7
+    c._maybe_greet()
+    assert c.speaker.said and "Andy" in c.speaker.said[-1]
+    said_before = len(c.speaker.said)
+    c.set(C.SLEEPING)
+    eng.wake_up()
+    eng.on_partial(99, "open notepad")                        # you kept talking after the wake word
+    eng.clock.t += 0.7
+    c._maybe_greet()
+    assert len(c.speaker.said) == said_before
+
+
+def test_background_launcher_is_windowless_and_background():
+    from lazymonster.service import launcher
+    cmd = launcher()
+    assert "--background" in cmd and ("monsterw" in cmd or "pythonw" in cmd)
+
+
+# ---- 0.8.0: close everything, save where you say, recap ------------------------------------
+@pytest.mark.parametrize("answer,expect", [
+    ("", ("save", "C:/temp", "haiku.txt")),
+    ("yes", ("save", "C:/temp", "haiku.txt")),
+    ("save it as bangalore poem", ("save", "C:/temp", "bangalore-poem")),
+    ("call it grocery list on the desktop", ("save", "Desktop", "grocery-list")),
+    ("no, don't save", ("discard", None, None)),
+])
+def test_save_answer_interpretation(answer, expect):
+    from lazymonster.savepaths import interpret
+    action, p = interpret(answer, "haiku.txt", "C:/temp")
+    assert action == expect[0]
+    if p is not None:
+        assert expect[1] in str(p).replace("\\\\", "/") and p.name == expect[2]
+
+
+def test_close_all_asks_about_unsaved_and_saves_where_told():
+    import threading
+    eng, ex, client, said, fb = make_agent([[("close_all", {})], [("finish", {"summary": "All closed."})]])
+    ex.owned = [{"kind": "window", "label": "Notepad (haiku)", "dirty": True, "suggest": "haiku.txt"},
+                {"kind": "proc", "label": "main.py from snake", "dirty": False}]
+    agent = eng.worker.agent
+    threading.Timer(0.05, lambda: agent.hear("save it as bangalore poem")).start()
+    agent.run("close everything")
+    assert said[0].startswith("Notepad (haiku) has unsaved changes")
+    assert ex.saved and ex.saved[0][1].endswith("bangalore-poem.txt")
+    assert ex.closed == ["Notepad (haiku)", "main.py from snake"]
+
+
+def test_close_all_with_no_answer_saves_to_default_folder():
+    eng, ex, client, said, fb = make_agent([[("close_all", {})], [("finish", {"summary": "Done."})]])
+    ex.owned = [{"kind": "window", "label": "Notepad (note)", "dirty": True, "suggest": "note.txt"}]
+    eng.worker.agent.ask_timeout = 0.05
+    eng.worker.agent.run("close everything")
+    assert ex.saved[0][1].replace("\\\\", "/").startswith("/tmp/lazymonster-test/note")
+
+
+def test_close_all_discard():
+    import threading
+    eng, ex, client, said, fb = make_agent([[("close_all", {})], [("finish", {"summary": "Done."})]])
+    ex.owned = [{"kind": "window", "label": "Notepad (x)", "dirty": True, "suggest": "x.txt"}]
+    threading.Timer(0.05, lambda: eng.worker.agent.hear("no")).start()
+    eng.worker.agent.run("close everything")
+    assert ex.saved == [] and ex.closed == ["Notepad (x)"]
+
+
+def test_journal_recap_and_context(tmp_path, monkeypatch):
+    monkeypatch.setenv("APPDATA", str(tmp_path))
+    from lazymonster import journal
+    journal.add("Hey Monster, can you make a snake game in VS Code", "Made it", ["C:\\\\x\\\\main.py"])
+    journal.add("write a haiku about Bangalore traffic in Notepad", "Done", [])
+    r = journal.recap()
+    assert "snake game" in r and "haiku about Bangalore" in r
+    assert "main.py" in journal.context()
+    assert journal.files_in(["wrote 111 lines to C:\\\\a\\\\b\\\\main.py; verified"]) == ["C:\\\\a\\\\b\\\\main.py"]
+
+
+def test_first_greeting_is_a_recap_and_seeds_the_conversation(tmp_path, monkeypatch):
+    monkeypatch.setenv("APPDATA", str(tmp_path))
+    from lazymonster import journal
+    journal.add("make a snake game in VS Code", "Made it", [])
+    eng, ex, client, said, fb = make_agent([])
+    c, events = _conv(eng, user_name="Andy")
+    c.recap = True
+    g = c.greeting()
+    assert g.startswith("Welcome back, Andy.") and "snake game" in g and "start fresh" in g
+    assert eng.in_session() and eng.worker.agent.history[0]["content"] == g
+    assert "Andy" in c.greeting() and "Welcome back" not in c.greeting()      # only once
+
+
+# ---- 0.9.0 ---------------------------------------------------------------------------------
+def test_tap_cuts_out_the_monsters_own_voice():
+    import numpy as np
+    from lazymonster.stt_refine import AudioTap
+    clock = Clock()
+    tap = AudioTap(clock=clock)
+    def add(t, v):
+        clock.t = t
+        tap.buf.append((t, np.full(1600, v, dtype="float32")))
+    add(1.0, 1.0)                                  # you
+    clock.t = 1.05; tap.mark_speaking(True)
+    add(1.2, 9.0); add(1.5, 9.0)                   # the monster talking
+    clock.t = 1.6; tap.mark_speaking(False)
+    add(1.8, 9.0)                                  # its echo tail
+    add(2.3, 2.0)                                  # you again
+    out = tap.slice(0.9, 2.4, preroll=0)
+    assert set(np.unique(out)) == {1.0, 2.0}
+
+
+def test_followup_only_when_it_asked_a_question():
+    eng, ex, client, said, fb = make_agent([[("finish", {"summary": "Done."})],
+                                            [("finish", {"summary": "Done.", "next": "Want me to save it?"})]])
+    eng.followup_only_on_question = True
+    eng.on_complete(1, "hey monster make a note please")
+    assert "followup" not in fb and eng.armed_until == 0.0
+    eng.on_complete(2, "hey monster make another note")
+    assert "followup" in fb
+
+
+@pytest.mark.parametrize("text", ["you can sleep", "go sleep", "just go to sleep man", "thats all", "stop listening"])
+def test_sleep_phrases(text):
+    exited = []
+    eng, ex, *_ = make(on_exit=lambda: exited.append(1))
+    eng.on_complete(1, "hey monster " + text)
+    assert exited == [1]
+
+
+def test_agent_can_put_itself_to_sleep():
+    slept = []
+    eng, ex, client, said, fb = make_agent([[("go_to_sleep", {})]])
+    eng.worker.agent.on_sleep = lambda: slept.append(1)
+    eng.worker.agent.run("I'm done for today, you can rest")
+    assert slept == [1]
+
+
+def test_json_written_as_text_is_spoken_as_a_sentence():
+    eng, ex, client, said, fb = make_agent(['{"summary":"Split the site into pages.","next":"Want shared navigation?"}'])
+    eng.worker.agent.run("split the pages")
+    assert said == ["Split the site into pages. Want shared navigation?"]
+    assert eng.worker.agent.suggestion == "Want shared navigation?"
+
+
+def test_questions_are_limited_per_task():
+    import threading
+    eng, ex, client, said, fb = make_agent([[("ask_user", {"question": "A?"})], [("ask_user", {"question": "B?"})],
+                                            [("ask_user", {"question": "C?"})], [("finish", {"summary": "ok"})]])
+    agent = eng.worker.agent
+    agent.ask_timeout = 0.05
+    agent.run("do it")
+    tool = [m["content"] for m in client.seen if m.get("role") == "tool"]
+    assert "Do not ask again" in tool[-1] and said.count("C?") == 0
+
+
+def test_code_run_approval_is_remembered_per_project():
+    import threading
+    eng, ex, client, said, fb = make_agent([
+        [("code_run", {"project": "snake", "path": "main.py"})], [("code_run", {"project": "snake", "path": "main.py"})],
+        [("finish", {"summary": "ok"})]])
+    agent = eng.worker.agent
+    threading.Timer(0.05, lambda: agent.hear("yes")).start()
+    agent.run("run it twice")
+    assert said.count("Run main.py from snake now?") == 1 and [c.name for c in ex.calls] == ["code_run", "code_run"]
+
+
+def test_escalates_to_stronger_model_after_failures():
+    class Failing(DryRunExecutor):
+        def run(self, intent):
+            self.calls.append(intent); return False, "nope", None
+    eng, ex, client, said, fb = make_agent([[("list_windows", {})], [("list_windows", {})]])
+    strong = ScriptedClient([[("finish", {"summary": "Fixed it."})]])
+    strong.model = "gpt-6-astra"
+    agent = eng.worker.agent
+    agent.ex, agent.escalation = Failing(), strong
+    agent.run("hard thing")
+    assert said[-1].startswith("Fixed it.")
+
+
+def test_web_research_reads_sources():
+    from lazymonster.agent import _responses_text
+    data = {"output": [{"type": "web_search_call"}, {"type": "message", "content": [
+        {"type": "output_text", "text": "Meta released Llama 5.", "annotations": [
+            {"type": "url_citation", "url": "https://ai.meta.com/x", "title": "Meta AI"}]}]}]}
+    text, src = _responses_text(data)
+    assert text == "Meta released Llama 5." and src == [("Meta AI", "https://ai.meta.com/x")]
+
+
+def test_outline_builds_a_real_deck(tmp_path):
+    from pptx import Presentation
+    from lazymonster.office_docs import build_pptx, parse_outline
+    outline = "# Meta AI\nWhat it is and why it matters\n# What is Meta AI\n- Assistant in WhatsApp\n- Llama models\n# Why it matters\n- Billions of users"
+    assert [s[0] for s in parse_outline(outline)] == ["Meta AI", "What is Meta AI", "Why it matters"]
+    p = build_pptx("Meta AI", outline, tmp_path / "deck.pptx")
+    assert len(Presentation(str(p)).slides) == 3
+
+
+def test_open_file_only_documents_in_your_folders(tmp_path, monkeypatch):
+    from lazymonster.actions import files
+    monkeypatch.setattr(files, "out_dir", lambda: tmp_path)
+    monkeypatch.setattr(files.Path, "home", staticmethod(lambda: tmp_path))
+    (tmp_path / "code" / "cafe").mkdir(parents=True)
+    (tmp_path / "code" / "cafe" / "index.html").write_text("<h1>cafe</h1>")
+    (tmp_path / "code" / "cafe" / "run.bat").write_text("echo hi")
+    assert files.resolve_file("cafe/index.html").name == "index.html"
+    assert files.resolve_file("index.html").name == "index.html"
+    with pytest.raises(GuardError):
+        files.resolve_file("cafe/run.bat")
+    with pytest.raises(GuardError):
+        files.resolve_file("C:/Windows/System32/notepad.exe")
+
+
+# ---- 0.10.0: voice lock, push-to-talk, orb ------------------------------------------------
+def test_voice_lock_blocks_other_voices():
+    eng, ex, client, said, fb = make_agent([[("finish", {"summary": "ok"})]])
+    eng.verify = lambda t0: False                          # not Andy
+    eng.on_complete(1, "hey monster mute")
+    eng.on_complete(2, "hey monster open notepad and write a poem")
+    assert ex.calls == [] and client.seen == [] and fb.count("unknown") == 2
+
+
+def test_voice_lock_lets_you_through():
+    eng, ex, *_ = make_agent([])
+    eng.verify = lambda t0: True
+    eng.on_complete(1, "hey monster mute")
+    assert ex.calls == [Intent.make("mute")]
+
+
+def test_typed_and_push_to_talk_skip_the_lock():
+    eng, ex, client, said, fb = make_agent([[("finish", {"summary": "ok"})]])
+    eng.verify = lambda t0: False
+    eng.handle_text("mute")                               # typed
+    assert ex.calls == [Intent.make("mute")]
+    c, events = _conv(eng)
+    eng.feedback = c.feedback
+    c.push_to_talk()                                       # hotkey / click on the orb
+    eng.on_complete(9, "unmute")
+    assert ex.calls[-1] == Intent.make("unmute")
+
+
+def test_voice_lock_errors_never_lock_you_out():
+    eng, ex, *_ = make_agent([])
+    def boom(t0): raise RuntimeError("model missing")
+    eng.verify = boom
+    eng.on_complete(1, "hey monster mute")
+    assert ex.calls == [Intent.make("mute")]
+
+
+@pytest.mark.parametrize("combo,ok", [("ctrl+alt+space", True), ("win+shift+m", True), ("space", False), ("ctrl+nope", False)])
+def test_hotkey_parse(combo, ok):
+    from lazymonster.hotkey import parse
+    if ok:
+        mods, vk = parse(combo)
+        assert mods & 0x4000 and vk
+    else:
+        with pytest.raises(ValueError):
+            parse(combo)
+
+
+def test_sleep_goes_to_orb_not_quit():
+    from lazymonster.ui.app import UIBus
+    bus = UIBus()
+    sent = []
+    bus._send = sent.append
+    bus.ready.set()
+    class W:
+        calls = []
+        def resize(self, w, h): W.calls.append(("resize", w, h))
+        def move(self, x, y): W.calls.append(("move", x, y))
+        def show(self): W.calls.append(("show",))
+    bus.window, bus.geom = W(), {"full": (10, 20, 400, 760), "orb": (900, 700, 170, 180)}
+    bus.set_orb(True)
+    bus.set_orb(False)
+    assert [e for e in sent if e["type"] == "orb"] == [{"type": "orb", "on": True}, {"type": "orb", "on": False}]
+    assert ("resize", 170, 180) in W.calls and ("resize", 400, 760) in W.calls
+
+
+# ---- 0.11.0: macOS ------------------------------------------------------------------------
+@pytest.mark.parametrize("combo,expect", [("cmd+shift+space", "<cmd>+<shift>+<space>"), ("ctrl+alt+m", "<ctrl>+<alt>+m"),
+                                          ("option+f5", "<alt>+<f5>")])
+def test_mac_hotkey_format(combo, expect):
+    from lazymonster.hotkey import to_pynput
+    assert to_pynput(combo) == expect
+
+
+def test_refiner_per_machine(monkeypatch):
+    from lazymonster import platform_info, stt_refine
+    from lazymonster.config import Config
+    cfg = Config()
+    for arm, mac, cls in [(True, True, "MLXRefiner"), (False, True, "FasterWhisperRefiner"), (False, False, "WhisperRefiner")]:
+        monkeypatch.setattr(platform_info, "IS_APPLE_SILICON", arm)
+        monkeypatch.setattr(platform_info, "IS_MAC", mac)
+        assert type(stt_refine.make_refiner(cfg, [])).__name__ == cls
+
+
+def test_keychain_used_on_mac(monkeypatch):
+    from lazymonster import secrets
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    monkeypatch.setattr(secrets, "IS_MAC", True)
+    class R: returncode, stdout = 0, "sk-from-keychain\n"
+    calls = []
+    monkeypatch.setattr(secrets.subprocess, "run", lambda *a, **k: calls.append(a[0]) or R())
+    assert secrets.get_key("OPENAI_API_KEY") == "sk-from-keychain"
+    assert calls[0][:3] == ["security", "find-generic-password", "-s"]
+
+
+class _FakeRec:
+    """Stands in for the sherpa recognizer: 'hears' the blocks it gets as text."""
+    def __init__(self): self.fed = []
+    def create_stream(self): return _FakeStream(self)
+    def is_ready(self, s): return False
+    def decode_stream(self, s): pass
+    def get_result(self, s): return ""
+    def is_endpoint(self, s): return False
+    def reset(self, s): pass
+
+
+class _FakeStream:
+    def __init__(self, rec): self.rec = rec
+    def accept_waveform(self, sr, block): self.rec.fed.append(float(block.max()) if len(block) else 0.0)
+
+
+def test_sherpa_mic_modes(monkeypatch):
+    import numpy as np
+    from lazymonster import stt_sherpa
+    monkeypatch.setattr(stt_sherpa, "recognizer", lambda pause_s=0.6: _FakeRec())
+    m = stt_sherpa.SherpaMic(lambda l, t: None, lambda l, t: None)
+    rec = m.rec
+    m.set_reasons({"idle"})                                   # asleep: nothing decoded, but remembered
+    for v in (1.0, 2.0):
+        m.on_audio(np.full(1600, v, dtype=np.float32))
+    m.drain()
+    before = len(rec.fed)
+    m.set_reasons(set())                                      # wake: warm-up silence, then the replay
+    m.drain()
+    assert rec.fed[before:] == [0.0, 1.0, 2.0]
+    m.set_reasons({"speaking"})                               # its own voice: fed as silence
+    m.on_audio(np.full(1600, 9.0, dtype=np.float32)); m.drain()
+    assert rec.fed[-1] == 0.0
+
+
+def test_mac_launch_agent(tmp_path, monkeypatch):
+    import plistlib
+    from lazymonster import service
+    monkeypatch.setattr(service.Path, "home", staticmethod(lambda: tmp_path))
+    monkeypatch.setattr(service.subprocess, "run", lambda *a, **k: None)
+    monkeypatch.setenv("APPDATA", str(tmp_path / "cfg"))
+    monkeypatch.setattr(service.os, "getuid", lambda: 501, raising=False)
+    p = service._install_mac()
+    d = plistlib.loads(open(p, "rb").read())
+    assert d["Label"] == "com.lazymonster.agent" and d["RunAtLoad"] is True and "--background" in d["ProgramArguments"]

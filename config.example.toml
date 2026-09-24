@@ -1,0 +1,53 @@
+# Copy to %APPDATA%\lazymonster\config.toml  (all keys optional)
+[lazymonster]
+model = "small"           # tiny | small | medium (English streaming)
+update_interval = 0.1     # seconds between partial transcripts
+stable_updates = 2        # identical partials before an instant command fires early
+require_prefix = true     # must say "hey monster", not a bare "monster" in conversation
+always_listen = false
+planner = "openai"        # openai | jev (placeholder) | none (instant commands only)
+accelerator = "auto"      # auto | npu | gpu | cpu  (on-device models; auto prefers the NPU)
+agent_max_steps = 16
+escalation_model = "gpt-6-astra"   # stronger model for hard or failing tasks; "" = never
+voice = "kokoro"          # kokoro (local) | openai | windows | off
+kokoro_voice = "af_heart" # af_heart, af_bella, af_nicole, bf_emma, hf_alpha, hf_beta
+kokoro_speed = 1.05
+kokoro_quality = "fp32"   # fp32 (best) | fp16 | int8 (smallest)
+stt_refine = true         # re-hear agent requests with Whisper on the NPU
+stt_model = "OpenVINO/distil-whisper-large-v3-int8-ov"   # or OpenVINO/whisper-large-v3-turbo-int4-ov
+stt_device = "auto"       # auto = NPU, then GPU, then CPU
+vocabulary = []
+wake_engine = "auto"      # auto (NPU model if trained, plus transcript) | transcript
+wake_sensitivity = 0.0    # 0.1 if it misses you, -0.1 if it wakes by itself
+idle_gate = true          # with the NPU wake word, the CPU transcriber sleeps until "Hey Monster"
+turn_delay = 0.9          # seconds of quiet that end your turn
+chimes = true             # three soft sounds: wake, done, error
+acks = true               # say "On it" when a task starts
+greet = true              # "Hi Andy, how can I help?" after a bare "Hey Monster"
+user_name = ""            # empty = first name from your Windows account
+hide_after = 45.0         # background mode: hide the window after this long asleep
+voice_lock = true         # after monster voice-enroll: act only on your voice
+push_to_talk = "ctrl+alt+space"   # global hotkey; "" = off
+default_save_dir = "C:\\temp"  # where unsaved work goes if you don't name a place           # extra names and words, e.g. ["Koramangala", "MemFork"]
+tts_model = "gpt-4o-mini-tts"
+tts_voice = "coral"       # alloy, ash, ballad, coral, echo, fable, nova, onyx, sage, shimmer
+tts_instructions = "Warm, upbeat and a little playful, like a helpful friend. Brisk pace. Short sentences."
+log_text = true           # %APPDATA%\lazymonster\log.jsonl, stays on this machine
+beeps = true
+
+[lazymonster.openai]
+model = "gpt-5.4-mini"    # any chat-completions model with tool calling
+api_key_env = "OPENAI_API_KEY"
+base_url = "https://api.openai.com/v1"   # any OpenAI-compatible endpoint works
+timeout = 45.0
+reasoning_effort = ""     # set "low" for reasoning models to cut latency
+
+[lazymonster.jev]              # placeholder: implement JevPlanner / JevWriter in lazymonster/planner.py
+url = ""
+api_key_env = "JEV_API_KEY"
+timeout = 30.0
+
+[lazymonster.apps.obsidian]    # add or override apps
+open = "obsidian://"
+process = "Obsidian.exe"
+say = ["obsidian", "notes"]

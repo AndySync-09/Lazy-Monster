@@ -1,0 +1,62 @@
+utterance,intent,args
+set volume to 30,volume_set,"{""level"": 30}"
+volume twenty five percent,volume_set,"{""level"": 25}"
+turn the volume to 80%,volume_set,"{""level"": 80}"
+could you set the sound to 50 please,volume_set,"{""level"": 50}"
+volume up,volume_up,{}
+turn the volume up by 20,volume_up,"{""step"": 20}"
+louder,volume_up,{}
+volume down,volume_down,{}
+quieter,volume_down,{}
+lower the volume,volume_down,{}
+mute,mute,{}
+mute the sound,mute,{}
+unmute,unmute,{}
+play,media_play_pause,{}
+pause the music,media_play_pause,{}
+resume,media_play_pause,{}
+next song,media_next,{}
+skip this track,media_next,{}
+previous track,media_prev,{}
+lock the computer,lock,{}
+lock screen,lock,{}
+take a screenshot,screenshot,{}
+screen shot,screenshot,{}
+new tab,new_tab,{}
+open a new tab,new_tab,{}
+close this tab,close_tab,{}
+minimize,minimize,{}
+maximize the window,maximize,{}
+show desktop,show_desktop,{}
+switch windows,switch_window,{}
+set brightness to 60,brightness_set,"{""level"": 60}"
+brightness forty,brightness_set,"{""level"": 40}"
+open bluetooth settings,open_settings,"{""page"": ""bluetooth""}"
+open wifi settings,open_settings,"{""page"": ""network-wifi""}"
+open settings,open_settings,"{""page"": """"}"
+open chrome,open_app,"{""app"": ""chrome""}"
+launch google chrome,open_app,"{""app"": ""chrome""}"
+open the browser,open_app,"{""app"": ""chrome""}"
+start notepad,open_app,"{""app"": ""notepad""}"
+open calculator,open_app,"{""app"": ""calculator""}"
+open vs code,open_app,"{""app"": ""vscode""}"
+open file explorer,open_app,"{""app"": ""explorer""}"
+open youtube,open_app,"{""app"": ""youtube""}"
+open spotify,open_app,"{""app"": ""spotify""}"
+open task manager,open_app,"{""app"": ""task manager""}"
+close chrome,close_app,"{""app"": ""chrome""}"
+quit spotify,close_app,"{""app"": ""spotify""}"
+search for flights to bangkok,search_web,"{""query"": ""flights to bangkok""}"
+google weather in bangalore,search_web,"{""query"": ""weather in bangalore""}"
+type hello world,type_text,"{""text"": ""hello world""}"
+go to sleep,exit_app,{}
+put the computer to sleep,sleep,{}
+shut down the computer,shutdown,{}
+restart,restart,{}
+reboot the pc,restart,{}
+yes,confirm_yes,{}
+cancel,confirm_no,{}
+what's the meaning of life,none,{}
+open the pod bay doors,none,{}
+tell me a joke,none,{}
+volume,none,{}

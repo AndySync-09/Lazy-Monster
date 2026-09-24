@@ -1,0 +1,846 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Lazy-Monster: say it, the monster does it</title>
+<meta name="description" content="A local-first voice agent for Windows. Say Hey Monster and it opens apps, writes documents, builds slides and cleans up after itself, safely.">
+<meta property="og:title" content="Lazy-Monster: say it, the monster does it">
+<meta property="og:description" content="A local-first voice agent for Windows. Wake word on the NPU, only your voice, real work in real apps.">
+<meta property="og:image" content="https://raw.githubusercontent.com/AndySync-09/lazy-monster/main/docs/assets/brand/social-preview.png">
+<meta property="og:type" content="website">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="theme-color" content="#2A1E6E">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cpath d='M20 18 15 5l12 10zM44 18l5-13-12 10z' fill='%23C6F432'/%3E%3Cpath d='M8 56C7 34 18 16 32 16s25 18 24 40z' fill='%237C5CFF'/%3E%3Cpath d='M19 34q5 4 10 0M35 34q5 4 10 0' stroke='%2316142B' stroke-width='3.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Instrument+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --night:#2A1E6E; --night-2:#170F45; --ink:#16142B; --paper:#FFFFFF; --lime:#C6F432; --pink:#FF5FA2; --sky:#9DB8FF;
+  --lime-soft:#F3FBD2; --sky-soft:#E6EDFF; --pink-soft:#FFE3EF; --moon:#F3F1FF; --haze:#CFC9F2; --body:#45425E; --muted:#5E5B78;
+  --display:"Bricolage Grotesque","Helvetica Neue",Arial,sans-serif;
+  --sans:"Instrument Sans","Helvetica Neue",Helvetica,Arial,sans-serif;
+  --pad:clamp(20px,8vw,120px);
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--night:#24195F;--night-2:#120B38}}
+:root[data-theme="dark"]{--night:#24195F;--night-2:#120B38}
+:root{box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+html{scroll-padding-top:env(safe-area-inset-top,0px);scroll-behavior:smooth}
+*,*::before,*::after{box-sizing:border-box}
+body{margin:0;background:var(--night-2);color:var(--moon);font-family:var(--sans);-webkit-font-smoothing:antialiased;line-height:1.5;overflow-x:hidden}
+#sky{position:fixed;inset:0;width:100%;height:100%;z-index:0;pointer-events:none;display:block}
+.page{position:relative;z-index:1}
+a{color:inherit;text-decoration:none}
+h1,h2,h3{font-family:var(--display);margin:0;letter-spacing:-.03em}
+p{margin:0}
+button{font:inherit;cursor:pointer}
+img,svg,canvas{max-width:100%}
+:focus-visible{outline:3px solid var(--lime);outline-offset:3px}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.wrap{padding-inline:var(--pad)}
+.lede{font-size:clamp(17px,1.5vw,21px);color:var(--haze);max-width:40ch}
+.h2{font-size:clamp(38px,4.5vw,64px);line-height:1}
+.logo{font-family:var(--display);font-weight:800;font-size:26px;letter-spacing:-.02em;white-space:nowrap}
+.logo b{background:var(--lime);color:var(--ink);padding:0 8px;border-radius:8px;border:2px solid var(--ink);box-shadow:3px 3px 0 var(--pink)}
+
+.btn{display:inline-block;text-align:center;padding:16px 28px;border-radius:16px;border:2px solid var(--ink);font-weight:600;font-size:17px;transition:transform .1s,box-shadow .1s;color:var(--ink)}
+.btn-lime{background:var(--lime);box-shadow:4px 4px 0 var(--pink)}
+.btn-lime:active{transform:translate(3px,3px);box-shadow:1px 1px 0 var(--pink)}
+.btn-white{background:#fff;box-shadow:4px 4px 0 var(--ink)}
+.btn-white:active{transform:translate(3px,3px);box-shadow:1px 1px 0 var(--ink)}
+.btn-ghost{background:transparent;color:var(--moon);border-color:var(--moon)}
+.btn-ghost:hover{background:rgba(255,255,255,.08)}
+
+/* nav */
+header{display:flex;align-items:center;justify-content:space-between;padding-block:24px;gap:24px;position:relative}
+header nav{display:flex;gap:32px;font-weight:500}
+header nav a:hover{color:var(--lime)}
+.pill{padding:12px 22px;border-radius:999px;background:var(--lime);color:var(--ink);font-weight:600;font-size:15px;border:2px solid var(--ink);white-space:nowrap}
+.menu-btn{display:none;width:44px;height:44px;border-radius:12px;border:2px solid var(--ink);background:#fff;color:var(--ink);place-items:center}
+
+/* hero */
+.hero{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.05fr);gap:64px;padding-block:56px 96px;align-items:center}
+.hero-copy{display:flex;flex-direction:column;gap:26px}
+.live{display:flex;align-items:center;gap:10px;font-weight:600;font-size:15px;color:var(--lime)}
+.live i{width:10px;height:10px;border-radius:50%;background:var(--lime);animation:blink 1.4s infinite}
+@keyframes blink{50%{opacity:.25}}
+.hero h1{font-size:clamp(50px,6.2vw,92px);line-height:.95;font-weight:800;letter-spacing:-.035em}
+.say{display:flex;flex-direction:column;gap:12px;max-width:540px}
+.field{display:flex;align-items:center;gap:10px;background:#fff;border:2px solid var(--ink);border-radius:16px;padding:8px 8px 8px 16px;box-shadow:5px 5px 0 var(--ink)}
+.field .mic{flex:none;width:30px;height:30px;border-radius:9px;display:grid;place-items:center;background:var(--lime);border:2px solid var(--ink)}
+.field input{flex:1;min-width:0;border:0;outline:none;background:transparent;font:inherit;font-size:16px;color:var(--ink)}
+.field input::placeholder{color:#6B6885}
+.field:focus-within{box-shadow:5px 5px 0 var(--ink),0 0 0 3px var(--lime)}
+.field .btn{padding:11px 18px;font-size:15px;border-radius:12px;box-shadow:none;background:var(--pink);color:#fff}
+.tries{display:flex;flex-wrap:wrap;gap:8px}
+.tries button{border:2px solid var(--moon);background:transparent;color:var(--moon);border-radius:999px;padding:7px 14px;font-size:14px;font-weight:500}
+.tries button:hover,.tries button[aria-pressed="true"]{background:var(--moon);color:var(--ink)}
+.small{font-size:14px;color:var(--haze)}
+
+.card-stage{position:relative;display:flex;justify-content:center}
+.sticker{position:absolute;top:-20px;right:4%;transform:rotate(7deg);background:var(--lime);color:var(--ink);border:2px solid var(--ink);border-radius:999px;padding:10px 18px;font-weight:700;font-size:15px;z-index:2;animation:wobble 5s ease-in-out infinite}
+.sticker.two{top:auto;bottom:-30px;right:auto;left:auto;right:10%;background:var(--pink);color:#fff;transform:rotate(-6deg);animation-delay:-2.5s}
+@keyframes wobble{0%,100%{transform:rotate(7deg)}50%{transform:rotate(3deg) translateY(-3px)}}
+.sticker.two{animation-name:wobble2}
+@keyframes wobble2{0%,100%{transform:rotate(-6deg)}50%{transform:rotate(-2deg) translateY(-3px)}}
+.monster-card{width:100%;max-width:560px;background:#fff;color:var(--ink);border:2px solid var(--ink);border-radius:28px;padding:22px 22px 30px;box-shadow:10px 10px 0 var(--ink);display:flex;flex-direction:column;gap:14px;transform:rotate(-1.2deg)}
+.monster-card .meta{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;font-size:14px;color:var(--muted);padding-right:170px}
+.stage{background:#1C1450;border:2px solid var(--ink);border-radius:20px;overflow:hidden;position:relative}
+.stage canvas{display:block;width:100%;height:auto}
+.stage .status{position:absolute;left:14px;bottom:10px;font-size:13px;color:#CFC9F2;font-weight:500}
+.transcript{display:flex;flex-direction:column;gap:8px;min-height:92px}
+.b{max-width:88%;padding:9px 13px;border-radius:14px;font-size:15px;line-height:1.35;border:2px solid var(--ink)}
+.b.you{align-self:flex-end;background:var(--sky-soft);border-bottom-right-radius:4px}
+.b.mon{align-self:flex-start;background:var(--lime-soft);border-bottom-left-radius:4px}
+.b.hint{border:0;padding:0;color:var(--muted);font-size:14px}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chips span{font-size:13px;border:1.5px solid var(--ink);border-radius:999px;padding:4px 11px;background:#fff}
+.chips span.ok{background:var(--lime)}
+
+/* strip */
+.strip{background:var(--lime);color:var(--ink);border-block:2px solid var(--ink);padding-block:38px;display:flex;justify-content:space-between;align-items:center;gap:32px;flex-wrap:wrap}
+.strip p{font-family:var(--display);font-size:clamp(26px,2.4vw,34px);font-weight:700;letter-spacing:-.02em;line-height:1.15;max-width:24ch}
+.strip ul{list-style:none;margin:0;padding:0;display:flex;gap:28px;flex-wrap:wrap;font-size:17px;font-weight:500}
+.strip li{display:flex;align-items:center;gap:10px}
+
+/* how */
+.how{padding-block:120px 80px;display:flex;flex-direction:column;gap:56px}
+.split-head{display:flex;justify-content:space-between;align-items:flex-end;gap:40px;flex-wrap:wrap}
+.steps{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:20px}
+.step{background:#fff;color:var(--ink);border:2px solid var(--ink);border-radius:24px;padding:28px;display:flex;flex-direction:column;gap:14px}
+.step:nth-child(odd){transform:rotate(-1deg)}.step:nth-child(even){transform:rotate(1deg)}
+.num{width:48px;height:48px;border-radius:50%;border:2px solid var(--ink);display:grid;place-items:center;font-family:var(--display);font-weight:800;font-size:20px}
+.step h3{font-size:26px;letter-spacing:-.01em;margin-top:8px}
+.step p{color:var(--body)}
+.step .chip-tag{align-self:flex-start;font-size:13px;font-weight:600;border:1.5px solid var(--ink);border-radius:999px;padding:4px 10px;background:var(--sky-soft)}
+
+/* work */
+.work{padding-block:40px 120px;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:64px;align-items:center}
+.log{background:#fff;color:var(--ink);border:2px solid var(--ink);border-radius:28px;padding:30px;display:flex;flex-direction:column;gap:18px;box-shadow:10px 10px 0 var(--pink)}
+.log .q{font-weight:700;font-size:19px}
+.ans{display:flex;gap:14px;align-items:flex-start}
+.ans .dot{flex:none;width:36px;height:36px;border-radius:50%;border:2px solid var(--ink);display:grid;place-items:center}
+.ans .bubble{background:var(--sky-soft);border-radius:16px;padding:11px 15px;display:flex;flex-direction:column;gap:3px}
+.ans small{font-size:13px;color:var(--muted)}
+
+/* local */
+.local{background:#fff;color:var(--ink);border-block:2px solid var(--ink);padding-block:110px;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:72px;align-items:center}
+.local .lede{color:var(--body)}
+.local-copy{display:flex;flex-direction:column;gap:22px}
+.eyebrow{font-weight:600;color:#7C3FD6}
+.checks{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:14px;font-size:17px}
+.checks li{display:flex;gap:12px;align-items:center}
+.chipboard{background:var(--night);color:var(--moon);border:2px solid var(--ink);border-radius:28px;padding:30px;display:flex;flex-direction:column;gap:20px;box-shadow:10px 10px 0 var(--lime)}
+.chipboard-head{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+.chipboard-head strong{font-family:var(--display);font-size:24px;display:block}
+.badge{background:var(--lime);color:var(--ink);border:1.5px solid var(--ink);border-radius:999px;padding:6px 12px;font-size:13px;font-weight:600}
+.job{display:grid;grid-template-columns:92px minmax(0,1fr) 74px;gap:14px;align-items:center;font-size:15px}
+.job .track{height:22px;background:rgba(255,255,255,.1);border:1.5px solid var(--moon);border-radius:8px;overflow:hidden}
+.job .track span{display:block;height:100%;width:0;transition:width 1.2s cubic-bezier(.2,.8,.2,1)}
+.job b{text-align:right;font-weight:600;font-size:14px}
+.chipboard .note{background:rgba(255,255,255,.08);border:1.5px solid var(--moon);border-radius:16px;padding:14px 16px;font-size:15px}
+
+/* safety */
+.safe{padding-block:120px;display:flex;flex-direction:column;gap:56px}
+.safe-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:28px}
+.safe-grid div{border-top:3px solid var(--lime);padding-top:24px;display:flex;flex-direction:column;gap:12px}
+.safe-grid h3{font-size:24px;letter-spacing:-.01em}
+.safe-grid p{color:var(--haze)}
+
+/* phrases */
+.say-list{padding-bottom:120px;display:flex;flex-direction:column;gap:28px}
+.say-list h2{font-size:clamp(30px,3vw,44px)}
+.cat-list{display:flex;flex-wrap:wrap;gap:14px}
+.cat-list button{padding:13px 22px;border:2px solid var(--ink);border-radius:999px;background:#fff;color:var(--ink);font-size:clamp(15px,1.3vw,19px);font-weight:600;box-shadow:3px 3px 0 var(--ink);transition:transform .1s}
+.cat-list button:nth-child(3n){background:var(--lime)}
+.cat-list button:nth-child(4n){background:var(--sky-soft)}
+.cat-list button:hover{transform:translateY(-2px) rotate(-1deg)}
+
+/* final */
+.final{margin:0 var(--pad) 120px;background:var(--pink);color:#fff;border:2px solid var(--ink);border-radius:36px;padding:clamp(32px,5.5vw,80px);display:flex;justify-content:space-between;align-items:center;gap:40px;flex-wrap:wrap;box-shadow:10px 10px 0 var(--lime)}
+.final h2{font-size:clamp(36px,4.5vw,64px);line-height:1;max-width:14ch}
+.final .stores{display:flex;flex-direction:column;gap:14px;min-width:min(320px,100%)}
+.cmd{background:var(--ink);color:var(--lime);border-radius:12px;padding:12px 14px;font-size:14px;word-break:break-all;border:2px solid var(--ink)}
+
+/* footer */
+footer{background:var(--ink);color:#D9D7EA;padding-block:64px 40px;position:relative;z-index:1}
+.foot-top{display:flex;justify-content:space-between;gap:48px;flex-wrap:wrap}
+.foot-top .logo{color:#fff}
+.foot-cols{display:grid;grid-template-columns:repeat(3,minmax(0,auto));gap:64px}
+.foot-cols div{display:flex;flex-direction:column;gap:12px}
+.foot-cols strong{color:#fff;font-weight:600}
+.foot-cols a:hover{color:var(--lime)}
+.foot-bottom{border-top:1px solid #3A3757;margin-top:48px;padding-top:24px;display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap;font-size:14px}
+
+/* sound toggle */
+.sound{border:2px solid var(--moon);background:transparent;color:var(--moon);border-radius:999px;padding:9px 14px;font-size:14px;font-weight:600;display:flex;gap:8px;align-items:center}
+.sound[aria-pressed="true"]{background:var(--moon);color:var(--ink)}
+.voice-btn{flex:none;width:44px;height:44px;border-radius:12px;border:2px solid var(--ink);background:var(--lime);display:grid;place-items:center;box-shadow:none}
+.voice-btn[aria-pressed="true"]{background:var(--pink);animation:blink 1s infinite}
+.voice-note{font-size:13px;color:var(--haze);max-width:52ch}
+
+/* companion: the monster that follows you */
+.buddy{position:fixed;right:max(18px,env(safe-area-inset-right,0px));bottom:calc(18px + env(safe-area-inset-bottom,0px));z-index:20;display:flex;align-items:flex-end;gap:10px;opacity:0;transform:translateY(20px);transition:opacity .4s,transform .4s;pointer-events:none}
+.buddy.on{opacity:1;transform:none;pointer-events:auto}
+.buddy canvas{width:150px;height:auto;background:#1C1450;border:2px solid var(--ink);border-radius:22px;box-shadow:5px 5px 0 var(--lime);cursor:pointer;display:block}
+.buddy .say-bubble{background:#fff;color:var(--ink);border:2px solid var(--ink);border-radius:16px 16px 4px 16px;padding:10px 14px;font-size:14px;font-weight:600;max-width:220px;box-shadow:4px 4px 0 var(--ink);margin-bottom:26px}
+
+/* install */
+.install{padding-block:120px 60px;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.15fr);gap:64px;align-items:start}
+.reqs{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:12px;font-size:17px}
+.reqs li{display:flex;gap:12px;align-items:flex-start}
+.reqs small{display:block;color:var(--haze);font-size:14px}
+.cmds{display:flex;flex-direction:column;gap:14px;counter-reset:c}
+.cmdrow{min-width:0;background:#fff;color:var(--ink);border:2px solid var(--ink);border-radius:18px;padding:16px 18px;display:flex;flex-direction:column;gap:10px;box-shadow:6px 6px 0 var(--ink)}
+.cmdrow:nth-child(2){box-shadow:6px 6px 0 var(--pink)}.cmdrow:nth-child(3){box-shadow:6px 6px 0 var(--lime)}.cmdrow:nth-child(4){box-shadow:6px 6px 0 var(--sky)}
+.cmdrow .top{display:flex;justify-content:space-between;align-items:center;gap:12px}
+.cmdrow .top strong{font-family:var(--display);font-size:20px}
+.cmdrow code{display:block;background:var(--ink);color:var(--lime);border-radius:10px;padding:10px 12px;font-size:14px;white-space:normal;word-break:break-all;font-family:ui-monospace,Consolas,monospace}
+.os-tabs{display:flex;gap:8px}
+.os-tabs button{border:2px solid var(--ink);background:#fff;border-radius:999px;padding:5px 12px;font-size:13px;font-weight:600;color:var(--ink)}
+.os-tabs button[aria-selected="true"]{background:var(--ink);color:var(--lime)}
+.copy{border:2px solid var(--ink);background:var(--lime);border-radius:10px;padding:6px 12px;font-size:13px;font-weight:600}
+.copy.done{background:var(--ink);color:var(--lime)}
+
+/* faq */
+.faq{padding-block:60px 120px;display:flex;flex-direction:column;gap:32px}
+.faq-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
+.faq details{background:#fff;color:var(--ink);border:2px solid var(--ink);border-radius:20px;padding:18px 22px}
+.faq summary{cursor:pointer;font-family:var(--display);font-weight:700;font-size:19px;list-style:none;display:flex;justify-content:space-between;gap:12px}
+.faq summary::-webkit-details-marker{display:none}
+.faq summary::after{content:"+";font-size:24px;line-height:1;transition:transform .2s}
+.faq details[open] summary::after{transform:rotate(45deg)}
+.faq details p{margin-top:10px;color:var(--body)}
+
+/* compare */
+.compare{padding-block:40px 120px;display:flex;flex-direction:column;gap:36px}
+.table-wrap{overflow-x:auto;border:2px solid var(--ink);border-radius:24px;background:#fff;box-shadow:10px 10px 0 var(--pink)}
+.compare table{width:100%;border-collapse:collapse;color:var(--ink);min-width:640px;font-size:16px}
+.compare th,.compare td{padding:16px 18px;text-align:left;border-bottom:1.5px solid #E4E1F2}
+.compare thead th{font-family:var(--display);font-size:18px;background:var(--sky-soft)}
+.compare thead th:nth-child(2){background:var(--lime)}
+.compare td:nth-child(2){background:#FAFDEB;font-weight:600}
+.compare tr:last-child td{border-bottom:0}
+.yes{display:inline-flex;gap:6px;align-items:center}
+.mid{color:var(--muted)}
+
+@media (max-width:1080px){
+  .hero,.work,.local,.install{grid-template-columns:minmax(0,1fr)}
+  .faq-list{grid-template-columns:1fr}
+  .steps{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .work .log{order:2}
+}
+@media (max-width:860px){
+  header nav{display:none}
+  .menu-btn{display:grid}
+  header.open nav{display:flex;flex-direction:column;gap:18px;position:absolute;top:84px;left:20px;right:20px;background:#fff;color:var(--ink);border:2px solid var(--ink);border-radius:20px;padding:24px;z-index:10;box-shadow:6px 6px 0 var(--lime)}
+  .hero{padding-block:24px 64px;gap:56px}
+  .safe-grid{grid-template-columns:1fr}
+  .foot-cols{grid-template-columns:repeat(2,minmax(0,1fr));gap:24px}
+}
+@media (max-width:560px){
+  .monster-card .meta{padding-right:0;margin-top:18px}
+  .steps{grid-template-columns:1fr}
+  .step:nth-child(n){transform:none}
+  .monster-card{padding:14px;transform:none;box-shadow:6px 6px 0 var(--ink)}
+  .field{flex-wrap:wrap}
+  .field .btn{width:100%}
+  .job{grid-template-columns:74px minmax(0,1fr) 64px}
+  .how,.safe,.local{padding-block:64px}
+  .work{padding-bottom:64px}
+  .final{margin-bottom:64px;box-shadow:6px 6px 0 var(--lime)}
+  .btn{width:100%}
+  .pill{display:none}
+  .sound span{display:none}
+  .buddy canvas{width:96px}
+  .buddy .say-bubble{max-width:170px;font-size:13px;margin-bottom:12px}
+}
+@media (prefers-reduced-motion:reduce){
+  *{animation:none!important;transition:none!important}
+  html{scroll-behavior:auto}
+}
+</style>
+</head>
+<body>
+<canvas id="sky" aria-hidden="true"></canvas>
+<div class="page">
+
+<header class="wrap" id="top">
+  <a href="#top" class="logo" aria-label="Lazy-Monster home"><b>lazy</b>monster</a>
+  <nav aria-label="Main">
+    <a href="#how">How it works</a>
+    <a href="#local">Runs on your PC</a>
+    <a href="#safe">Safety</a>
+    <a href="#install">Install</a>
+    <a href="#faq">FAQ</a>
+  </nav>
+  <div style="display:flex;gap:12px;align-items:center">
+    <button class="sound" id="soundBtn" type="button" aria-pressed="false" aria-label="Sound effects"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M4 10v4h4l5 4V6L8 10z"/><path d="M16 9a4 4 0 0 1 0 6"/></svg><span>Sound off</span></button>
+    <a href="#get" class="pill">Get it on GitHub</a>
+    <button class="menu-btn" type="button" aria-label="Open menu" aria-expanded="false" id="menuBtn">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+    </button>
+  </div>
+</header>
+
+<main>
+  <section class="hero wrap">
+    <div class="hero-copy">
+      <div class="live"><i></i>Listening for "Hey Monster"</div>
+      <h1>Say it. The monster does it.</h1>
+      <p class="lede">A voice agent for your Windows PC. It opens apps, writes the document, builds the slides, and closes everything when you're done. The listening happens on your laptop.</p>
+      <form class="say" id="sayForm">
+        <label class="field">
+          <span class="sr">Try a request</span>
+          <input type="text" id="sayInput" placeholder="Try: open the cafe site in Chrome" autocomplete="off">
+          <button type="button" class="voice-btn" id="voiceBtn" aria-pressed="false" aria-label="Say it out loud"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#16142B" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg></button>
+          <button type="submit" class="btn">Hey Monster</button>
+        </label>
+        <div class="tries" id="tries">
+          <button type="button">Make 3 slides about Meta AI</button>
+          <button type="button">Close everything</button>
+          <button type="button">Mute</button>
+        </div>
+      </form>
+      <p class="voice-note" id="voiceNote">Tap the mic and say it out loud. On this website your browser's speech service does the listening; the real app listens on your PC.</p>
+    </div>
+
+    <div class="card-stage">
+      <div class="sticker">Wake word on the NPU</div>
+      <article class="monster-card" aria-label="Lazy-Monster demo">
+        <div class="meta"><span>You, at your desk</span><span id="clock">Asleep, still listening</span></div>
+        <div class="stage">
+          <canvas id="monster" width="640" height="420" aria-hidden="true"></canvas>
+          <span class="status" id="status">Sleeping. Say "Hey Monster".</span>
+        </div>
+        <div class="transcript" id="transcript" aria-live="polite">
+          <div class="b hint">Type a request or tap an example, and watch it decide.</div>
+        </div>
+        <div class="chips" id="chips"></div>
+      </article>
+      <div class="sticker two">Only answers your voice</div>
+    </div>
+  </section>
+
+  <section class="strip wrap" data-buddy="sleep" data-line="Zzz. Scroll on, I am resting my eyes.">
+    <p>Your PC, finally on speaking terms.</p>
+    <ul>
+      <li><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#16142B" stroke-width="2.4" aria-hidden="true"><path d="M4 12l5 5L20 6"/></svg>Hears you, not the TV</li>
+      <li><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#16142B" stroke-width="2.4" aria-hidden="true"><path d="M4 12l5 5L20 6"/></svg>Asks before anything risky</li>
+      <li><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#16142B" stroke-width="2.4" aria-hidden="true"><path d="M4 12l5 5L20 6"/></svg>Cleans up after itself</li>
+    </ul>
+  </section>
+
+  <section class="how wrap" id="how" data-buddy="listen" data-line="This is me listening. Pauses are fine.">
+    <div class="split-head">
+      <h2 class="h2" style="max-width:15ch">From a sentence to a finished job.</h2>
+      <p class="lede">Short things happen before you finish talking. Bigger jobs take a few seconds, and it tells you what it did.</p>
+    </div>
+    <div class="steps">
+      <div class="step"><span class="num" style="background:var(--lime)">1</span><h3>It wakes</h3><p>A tiny wake-word model on your NPU waits for "Hey Monster" all day, and only for your voice.</p><span class="chip-tag">Intel NPU</span></div>
+      <div class="step"><span class="num" style="background:var(--pink);color:#fff">2</span><h3>It listens</h3><p>Whisper hears your whole sentence, pauses included, and knows the names you use.</p><span class="chip-tag">Arc GPU</span></div>
+      <div class="step"><span class="num" style="background:var(--sky)">3</span><h3>It does the work</h3><p>Real apps, real files: Word, PowerPoint, VS Code, your browser. Every step is checked.</p><span class="chip-tag">Typed tools</span></div>
+      <div class="step"><span class="num" style="background:var(--ink);color:#fff">4</span><h3>It talks back</h3><p>A warm voice says what it did and offers the next step. Say "yes" and it carries on.</p><span class="chip-tag">Kokoro voice</span></div>
+    </div>
+  </section>
+
+  <section class="work wrap" data-buddy="act" data-line="Writing the file, checking it landed.">
+    <div class="log">
+      <div class="q">"Hey Monster, make me a snake game."</div>
+      <div class="ans"><span class="dot" style="background:var(--lime)"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#16142B" stroke-width="2.2"><path d="M4 12l5 5L20 6"/></svg></span><div class="bubble"><span>Wrote main.py in VS Code. Want me to run it?</span><small>2 steps, 9 seconds</small></div></div>
+      <div class="ans"><span class="dot" style="background:var(--sky)"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#16142B" stroke-width="2.2"><path d="M12 5v14M5 12h14"/></svg></span><div class="bubble"><span>Installing pygame in the project's own environment first.</span><small>You said yes once for this project</small></div></div>
+      <div class="ans"><span class="dot" style="background:var(--pink)"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2"><path d="M8 5l11 7-11 7z"/></svg></span><div class="bubble"><span>It's running. Say "close everything" when you're done playing.</span><small>Game window opened</small></div></div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:20px">
+      <h2 class="h2">Real work, not a chat window.</h2>
+      <p class="lede">It writes the file, opens it, and checks the result is actually there. If something doesn't work, it tries another way or asks you one clear question.</p>
+    </div>
+  </section>
+
+  <section class="local wrap" id="local" data-buddy="think" data-line="The NPU keeps my ears on. The rest waits.">
+    <div class="local-copy">
+      <span class="eyebrow">Built for AI PCs</span>
+      <h2 class="h2">Every chip gets a job.</h2>
+      <p class="lede" style="max-width:42ch">The always-on part runs on the low-power NPU, so it can listen all day without slowing you down. Only the thinking for bigger tasks uses the cloud.</p>
+      <ul class="checks">
+        <li><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#7C3FD6" stroke-width="2.4" aria-hidden="true"><path d="M4 12l5 5L20 6"/></svg>Nothing is sent anywhere until you say "Hey Monster"</li>
+        <li><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#7C3FD6" stroke-width="2.4" aria-hidden="true"><path d="M4 12l5 5L20 6"/></svg>Speech and voice stay on your laptop</li>
+        <li><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#7C3FD6" stroke-width="2.4" aria-hidden="true"><path d="M4 12l5 5L20 6"/></svg>Bring your own model key</li>
+      </ul>
+    </div>
+    <div class="chipboard" id="chipboard">
+      <div class="chipboard-head">
+        <div><span class="small" style="color:var(--haze)">Measured on a Core Ultra 9 laptop</span><strong>Who does what</strong></div>
+        <span class="badge">Three chips</span>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:14px">
+        <div class="job"><span>NPU</span><div class="track"><span data-w="18" style="background:var(--lime)"></span></div><b>wake word</b></div>
+        <div class="job"><span>Arc GPU</span><div class="track"><span data-w="62" style="background:var(--sky)"></span></div><b>0.75 s</b></div>
+        <div class="job"><span>CPU</span><div class="track"><span data-w="34" style="background:var(--pink)"></span></div><b>voice</b></div>
+        <div class="job"><span>Cloud</span><div class="track"><span data-w="48" style="background:#fff"></span></div><b>planning</b></div>
+      </div>
+      <div class="note"><strong>While it sleeps</strong><br>The speech model pauses and only the NPU listens, so an idle monster costs you almost nothing.</div>
+    </div>
+  </section>
+
+  <section class="safe wrap" id="safe" data-buddy="block" data-line="Delete your files? Nope. Not my job.">
+    <h2 class="h2" style="max-width:17ch">Lazy about chores. Never about safety.</h2>
+    <div class="safe-grid">
+      <div>
+        <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#C6F432" stroke-width="1.8" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>
+        <h3>Only your voice</h3>
+        <p>Read five sentences once. After that, a video or a guest saying "Hey Monster" gets ignored.</p>
+      </div>
+      <div>
+        <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#C6F432" stroke-width="1.8" aria-hidden="true"><path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6l8-3z"/><path d="M9 12l2 2 4-4"/></svg>
+        <h3>Asks first</h3>
+        <p>No terminals, no deleting, no sending, no buying. Running code or shutting down waits for your "yes".</p>
+      </div>
+      <div>
+        <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#C6F432" stroke-width="1.8" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18"/></svg>
+        <h3>Touches only its own mess</h3>
+        <p>"Close everything" closes what it opened, never your other tabs, and asks where to save unsaved work.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="say-list wrap" id="say" data-buddy="listen" data-line="Tap one. I will act it out up top.">
+    <h2>Things people say to it</h2>
+    <div class="cat-list" id="phrases">
+      <button type="button">Open the cafe site in Chrome</button><button type="button">Make 3 slides about Meta AI</button>
+      <button type="button">Research the latest Meta AI news</button><button type="button">Close everything</button>
+      <button type="button">Write a haiku in Notepad</button><button type="button">Mute</button>
+      <button type="button">What did we work on yesterday?</button><button type="button">Save it as a PDF</button><button type="button">Delete my Downloads folder</button>
+    </div>
+  </section>
+
+  <section class="install wrap" id="install" data-buddy="listen" data-line="One line. Then just talk to me.">
+    <div style="display:flex;flex-direction:column;gap:24px">
+      <h2 class="h2">One command. That's the install.</h2>
+      <p class="lede">Open PowerShell, paste it, press Enter. No admin rights. Run it again any time to update; your settings and voice stay.</p>
+      <ul class="reqs">
+        <li><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#C6F432" stroke-width="2.4" aria-hidden="true"><path d="M4 12l5 5L20 6"/></svg><div>Windows 10 or 11 with a microphone<small>Headset or laptop mic both work</small></div></li>
+        <li><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#C6F432" stroke-width="2.4" aria-hidden="true"><path d="M4 12l5 5L20 6"/></svg><div>About 3 GB of free space<small>Mostly the voice models, downloaded once</small></div></li>
+        <li><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#C6F432" stroke-width="2.4" aria-hidden="true"><path d="M4 12l5 5L20 6"/></svg><div>An OpenAI API key (optional)<small>The installer asks for it; instant commands work without it</small></div></li>
+        <li><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#9DB8FF" stroke-width="2.4" aria-hidden="true"><circle cx="12" cy="12" r="8"/></svg><div>Intel AI PC (optional)<small>The NPU runs the wake word; without one it uses the CPU</small></div></li>
+      </ul>
+    </div>
+    <div class="cmds">
+      <div class="cmdrow"><div class="top"><strong id="osLabel">Windows: paste into PowerShell</strong><button class="copy" type="button">Copy</button></div>
+        <div class="os-tabs" role="tablist"><button type="button" role="tab" aria-selected="true" data-os="win">Windows</button><button type="button" role="tab" aria-selected="false" data-os="mac">macOS: next week</button></div>
+        <code id="installCmd">irm https://raw.githubusercontent.com/AndySync-09/lazy-monster/main/install.ps1 | iex</code></div>
+      <div class="cmdrow" style="box-shadow:6px 6px 0 var(--lime)"><div class="top"><strong>What it does, in about 5 minutes</strong></div>
+        <ol style="margin:0;padding-left:20px;display:flex;flex-direction:column;gap:6px;color:var(--body)">
+          <li>Finds Python, or installs it for you</li>
+          <li>Installs Lazy-Monster in its own folder</li>
+          <li>Asks for your OpenAI key (optional)</li>
+          <li>Downloads the voice models and learns your voice</li>
+          <li>Starts it at sign-in and adds it to the Start menu</li>
+        </ol>
+      </div>
+      <details class="cmdrow" style="box-shadow:6px 6px 0 var(--sky)"><summary style="cursor:pointer;font-family:var(--display);font-weight:700;font-size:18px">Prefer to read the script first?</summary>
+        <p style="color:var(--body);margin-top:8px">Good habit. Open <a href="https://github.com/AndySync-09/lazy-monster/blob/main/install.ps1" style="text-decoration:underline">install.ps1 on GitHub</a>, or download it and run it yourself. To remove everything later, run <b>uninstall.ps1</b> from the install folder.</p>
+      </details>
+    </div>
+  </section>
+
+  <section class="compare wrap" id="compare" data-buddy="think" data-line="Honest table. No made-up numbers.">
+    <h2 class="h2" style="max-width:18ch">How it differs from other assistants.</h2>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th scope="col"></th><th scope="col">Lazy-Monster</th><th scope="col">Typical cloud voice assistant</th><th scope="col">Chatbot in a browser tab</th></tr></thead>
+        <tbody>
+          <tr><th scope="row">Does the work in your desktop apps</th><td>Word, PowerPoint, VS Code, browsers, files</td><td class="mid">Mostly settings and web answers</td><td class="mid">You copy and paste</td></tr>
+          <tr><th scope="row">Listening before the wake word</th><td>On your PC, on the NPU</td><td class="mid">Varies by product</td><td class="mid">Not always listening</td></tr>
+          <tr><th scope="row">Only reacts to your voice</th><td>Yes, after a one-minute setup</td><td class="mid">Varies by product</td><td class="mid">No voice</td></tr>
+          <tr><th scope="row">Asks before risky actions</th><td>Always, decided on your PC</td><td class="mid">Varies</td><td class="mid">Can't act</td></tr>
+          <tr><th scope="row">Closes only what it opened</th><td>Yes, and asks about unsaved work</td><td class="mid">Not applicable</td><td class="mid">Not applicable</td></tr>
+          <tr><th scope="row">Open source</th><td>Yes, Apache 2.0</td><td class="mid">Usually not</td><td class="mid">Usually not</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="faq wrap" id="faq" data-buddy="listen" data-line="Ask away. I'm listening.">
+    <h2 class="h2">Questions people ask.</h2>
+    <div class="faq-list">
+      <details><summary>Is it listening all the time?</summary><p>Only a small wake-word model listens, on your PC. Nothing is transcribed, saved or sent until you say "Hey Monster" or press Ctrl+Alt+Space.</p></details>
+      <details><summary>What leaves my PC?</summary><p>Your request as text, to plan bigger tasks with the model you choose. Speech recognition and the voice stay local. Research questions go to the web search you configure.</p></details>
+      <details><summary>What does it cost?</summary><p>The app is free. Bigger tasks use your own OpenAI key, usually a few cents at most; instant commands like "mute" cost nothing.</p></details>
+      <details><summary>How do I update or remove it?</summary><p>Run the install command again, or say "monster update" in a terminal. To remove it, run uninstall.ps1 from %LOCALAPPDATA%\LazyMonster\app. It asks before deleting your voice and settings.</p></details>
+      <details><summary>Do I need an NPU?</summary><p>No. With an Intel AI PC the wake word runs on the NPU and saves battery. Without one, it runs on the CPU.</p></details>
+      <details><summary>Does it work on a Mac?</summary><p>Next week, for Apple Silicon and Intel Macs. Watch the GitHub repo for releases and you'll hear the moment it lands.</p></details>
+      <details><summary>Can it delete my files?</summary><p>No. There is no delete, no terminal, no sending and no buying. It writes new files in its own folder and asks before anything risky.</p></details>
+      <details><summary>What if someone else says "Hey Monster"?</summary><p>With the voice lock on, it ignores voices that aren't yours. Typed requests and push-to-talk always work for you.</p></details>
+    </div>
+  </section>
+
+  <section class="final" id="get">
+    <h2>Be lazy. Professionally.</h2>
+    <div class="stores">
+      <a href="https://github.com/AndySync-09/lazy-monster" class="btn btn-white">Get it on GitHub</a>
+      <div class="cmd">irm https://raw.githubusercontent.com/AndySync-09/lazy-monster/main/install.ps1 | iex</div>
+      <span style="font-size:14px">One command in PowerShell. Then just say "Hey Monster".</span>
+    </div>
+  </section>
+</main>
+
+<footer class="wrap">
+  <div class="foot-top">
+    <div style="display:flex;flex-direction:column;gap:14px;max-width:340px">
+      <a href="#top" class="logo"><b>lazy</b>monster</a>
+      <p>A local-first voice agent for Windows. Open source under Apache 2.0.</p>
+    </div>
+    <div class="foot-cols">
+      <div><strong>Product</strong><a href="#how">How it works</a><a href="#local">Runs on your PC</a><a href="#say">Things to say</a></div>
+      <div><strong>Open source</strong><a href="https://github.com/AndySync-09/lazy-monster">GitHub</a><a href="https://github.com/AndySync-09/lazy-monster/blob/main/CHANGELOG.md">Changelog</a><a href="https://github.com/AndySync-09/lazy-monster/blob/main/SECURITY.md">Security</a></div>
+      <div><strong>Project</strong><a href="#safe">Safety</a><a href="https://github.com/AndySync-09/lazy-monster/blob/main/LICENSE">License</a><a href="https://github.com/AndySync-09/lazy-monster/issues">Report an issue</a></div>
+    </div>
+  </div>
+  <div class="foot-bottom">
+    <span>© 2026 Lazy-Monster. Made in Bengaluru.</span>
+    <span>The monster is lazy, not proprietary.</span>
+  </div>
+</footer>
+</div>
+<div class="buddy" id="buddy" aria-hidden="true"><div class="say-bubble" id="buddyLine"></div><canvas id="buddyCv" width="640" height="420" title="Back to the demo"></canvas></div>
+
+<script>
+(function () {
+  var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var small = window.innerWidth < 700;
+  var visible = !document.hidden;
+  document.addEventListener('visibilitychange', function () { visible = !document.hidden; });
+
+  /* ---------- sound: the app's three chimes, off by default ---------- */
+  var soundOn = false, actx = null;
+  try { soundOn = localStorage.getItem('lm-sound') === 'on'; } catch (e) {}
+  var soundBtn = document.getElementById('soundBtn');
+  function paintSound() { soundBtn.setAttribute('aria-pressed', soundOn); soundBtn.querySelector('span').textContent = soundOn ? 'Sound on' : 'Sound off'; }
+  paintSound();
+  soundBtn.addEventListener('click', function () { soundOn = !soundOn; try { localStorage.setItem('lm-sound', soundOn ? 'on' : 'off'); } catch (e) {} paintSound(); if (soundOn) chime('wake'); });
+  var NOTES = { wake: [[660, .07], [990, .09]], done: [[880, .06], [1320, .1]], error: [[440, .09], [330, .12]] };
+  function chime(kind) {
+    if (!soundOn) return;
+    try {
+      actx = actx || new (window.AudioContext || window.webkitAudioContext)();
+      var t = actx.currentTime;
+      NOTES[kind].forEach(function (n) {
+        var o = actx.createOscillator(), g = actx.createGain();
+        o.frequency.value = n[0]; o.type = 'sine';
+        g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(.16, t + .008); g.gain.exponentialRampToValueAtTime(.001, t + n[1]);
+        o.connect(g); g.connect(actx.destination); o.start(t); o.stop(t + n[1] + .02); t += n[1];
+      });
+    } catch (e) {}
+  }
+
+  /* ---------- the night sky ---------- */
+  var sky = document.getElementById('sky'), sx = sky.getContext('2d'), W = 0, H = 0, dpr = 1;
+  var stars = [], dust = [], zs = [], mouse = { x: -999, y: -999 };
+  function size() {
+    dpr = Math.min(window.devicePixelRatio || 1, small ? 1.5 : 2);
+    W = window.innerWidth; H = window.innerHeight;
+    sky.width = W * dpr; sky.height = H * dpr; sx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    var n = Math.round(W * H / (small ? 16000 : 9000));
+    stars = []; dust = [];
+    for (var i = 0; i < n; i++) stars.push({ x: Math.random() * W, y: Math.random() * H, r: Math.random() * 1.3 + .3, p: Math.random() * 6.28 });
+    for (var j = 0; j < Math.round(n / 2.2); j++) dust.push({ x: Math.random() * W, y: Math.random() * H, vx: 0, vy: 0, k: Math.random(), c: Math.random() < .5 ? '#A993FF' : (Math.random() < .5 ? '#C6F432' : '#FF5FA2') });
+  }
+  size(); window.addEventListener('resize', size);
+  window.addEventListener('pointermove', function (e) { mouse.x = e.clientX; mouse.y = e.clientY; });
+  function drawSky(t) {
+    var g = sx.createLinearGradient(0, 0, 0, H);
+    g.addColorStop(0, '#170F45'); g.addColorStop(.55, '#2A1E6E'); g.addColorStop(1, '#3B2A8C');
+    sx.fillStyle = g; sx.fillRect(0, 0, W, H);
+    var gl = sx.createRadialGradient(W * .8, H * .15, 0, W * .8, H * .15, Math.max(W, H) * .6);
+    gl.addColorStop(0, 'rgba(255,95,162,.16)'); gl.addColorStop(1, 'rgba(255,95,162,0)');
+    sx.fillStyle = gl; sx.fillRect(0, 0, W, H);
+    for (var i = 0; i < stars.length; i++) {
+      var s = stars[i];
+      sx.globalAlpha = .35 + .45 * Math.abs(Math.sin(t / 1400 + s.p));
+      sx.fillStyle = '#F3F1FF'; sx.beginPath(); sx.arc(s.x, s.y, s.r, 0, 6.283); sx.fill();
+    }
+    var sc = window.scrollY * .15;
+    for (var j = 0; j < dust.length; j++) {
+      var d = dust[j];
+      var tx = d.x + Math.sin(t / 3000 + d.k * 20) * 20, ty = ((d.y - sc - t / 60 * d.k) % H + H) % H;
+      var dx = tx - mouse.x, dy = ty - mouse.y, dd = dx * dx + dy * dy;
+      if (dd < 14000) { d.vx += dx / Math.sqrt(dd + 1) * 1.6; d.vy += dy / Math.sqrt(dd + 1) * 1.6; }
+      d.vx *= .9; d.vy *= .9;
+      sx.globalAlpha = .55; sx.fillStyle = d.c;
+      sx.fillRect(tx + d.vx * 8, ty + d.vy * 8, 2.6, 2.6);
+    }
+    if (Math.random() < .012 && zs.length < 7) zs.push({ x: Math.random() * W, y: H + 20, s: 18 + Math.random() * 34, v: .25 + Math.random() * .35, a: 0 });
+    for (var k = zs.length - 1; k >= 0; k--) {
+      var z = zs[k]; z.y -= z.v; z.a = Math.min(.5, z.a + .004);
+      sx.globalAlpha = z.a * Math.min(1, z.y / (H * .5)); sx.fillStyle = '#C6F432';
+      sx.font = '800 ' + z.s + 'px "Bricolage Grotesque", sans-serif';
+      sx.fillText('z', z.x + Math.sin((H - z.y) / 60) * 14, z.y);
+      if (z.y < -40) zs.splice(k, 1);
+    }
+    sx.globalAlpha = 1;
+  }
+
+  /* ---------- particle monster, reusable (hero + companion) ---------- */
+  var MW = 640, MH = 420, CX = 320;
+  var V = '#7C5CFF', V2 = '#A993FF', L = '#C6F432', A = '#F5C451', P = '#FF5FA2', T = '#EDEFF5', DIM = '#4A4270';
+  function sample(draw, n) {
+    var o = document.createElement('canvas'); o.width = MW; o.height = MH; var g = o.getContext('2d');
+    g.fillStyle = '#fff'; g.strokeStyle = '#fff'; draw(g);
+    var d = g.getImageData(0, 0, MW, MH).data, pts = [];
+    for (var yy = 0; yy < MH; yy += 4) for (var xx = 0; xx < MW; xx += 4) if (d[(yy * MW + xx) * 4 + 3] > 128) pts.push([xx, yy]);
+    for (var i = pts.length - 1; i > 0; i--) { var j = Math.floor(Math.random() * (i + 1)); var tmp = pts[i]; pts[i] = pts[j]; pts[j] = tmp; }
+    var out = []; for (var k = 0; k < n; k++) out.push(pts[k % Math.max(pts.length, 1)] || [CX, 220]); return out;
+  }
+  function body(g, open) {
+    g.beginPath(); g.moveTo(170, 340); g.bezierCurveTo(160, 230, 230, 130, 320, 130); g.bezierCurveTo(410, 130, 480, 230, 470, 340); g.closePath(); g.fill();
+    g.globalCompositeOperation = 'destination-out'; g.lineWidth = 12; g.lineCap = 'round';
+    if (open) { [278, 362].forEach(function (ex) { g.beginPath(); g.arc(ex, 225, 18, 0, 6.283); g.fill(); }); g.beginPath(); g.ellipse(320, 280, 18, 13, 0, 0, 6.283); g.fill(); }
+    else { [278, 362].forEach(function (ex) { g.beginPath(); g.arc(ex, 212, 22, .5, 2.64); g.stroke(); }); g.beginPath(); g.ellipse(320, 278, 10, 8, 0, 0, 6.283); g.fill(); }
+    g.globalCompositeOperation = 'source-over';
+  }
+  function horns(g) { g.beginPath(); g.moveTo(248, 145); g.lineTo(228, 70); g.lineTo(284, 132); g.fill(); g.beginPath(); g.moveTo(392, 145); g.lineTo(412, 70); g.lineTo(356, 132); g.fill(); }
+  function shapes(N) {
+    var nh = Math.floor(N * .13), sh = { N: N, nh: nh };
+    sh.monS = sample(function (g) { body(g, false); }, N - nh).concat(sample(horns, nh));
+    sh.monO = sample(function (g) { body(g, true); }, N - nh).concat(sample(horns, nh));
+    sh.qS = sample(function (g) { g.font = 'bold 300px sans-serif'; g.textAlign = 'center'; g.fillText('?', CX, 320); }, N);
+    sh.chk = sample(function (g) { g.lineWidth = 40; g.lineCap = 'round'; g.lineJoin = 'round'; g.beginPath(); g.moveTo(190, 220); g.lineTo(290, 310); g.lineTo(460, 120); g.stroke(); }, N);
+    sh.xS = sample(function (g) { g.lineWidth = 44; g.lineCap = 'round'; g.beginPath(); g.moveTo(210, 90); g.lineTo(430, 330); g.moveTo(430, 90); g.lineTo(210, 330); g.stroke(); }, N);
+    sh.frame = sample(function (g) { g.lineWidth = 8; g.strokeRect(150, 70, 340, 280); g.fillRect(150, 70, 340, 30); }, Math.floor(N * .45));
+    sh.LN = 5; sh.per = Math.ceil(N * .55 / sh.LN);
+    var lines = [];
+    for (var li = 0; li < sh.LN; li++) (function (i) { lines.push(sample(function (g) { g.fillRect(180, 130 + i * 40, [270, 230, 290, 180, 240][i], 13); }, sh.per)); })(li);
+    sh.actT = sh.frame.concat.apply(sh.frame, lines).slice(0, N);
+    return sh;
+  }
+  function Monster(cv, N, sz) {
+    var x = cv.getContext('2d'), sh = shapes(N), m = { st: 'sleep', t0: performance.now(), tree: null, shown: 0 };
+    var parts = []; for (var pi = 0; pi < N; pi++) parts.push({ x: CX + (Math.random() - .5) * 360, y: 220 + (Math.random() - .5) * 260, vx: 0, vy: 0, k: Math.random(), b: 0, f: Math.random(), fall: 0, a: 1 });
+    var root = [CX, 400];
+    function pick() {
+      if (!m.tree) return 0; var dec = performance.now() - m.tree.t > 1400;
+      var w = m.tree.nodes.map(function (n) { return dec ? (n.win ? 1 : 0) : n.p; }), s = w.reduce(function (a, b) { return a + b; }, 0) || 1, r = Math.random() * s, i = 0;
+      while (i < w.length - 1 && r > w[i]) { r -= w[i]; i++; } return i;
+    }
+    m.set = function (s) { if (s === m.st) return; m.st = s; m.t0 = performance.now(); if (s !== 'act') m.shown = 0; parts.forEach(function (p) { p.fall = 0; p.a = 1; p.f = Math.random(); p.b = pick(); }); };
+    m.setTree = function (c) {
+      var xs = c.length === 1 ? [CX] : c.length === 2 ? [180, 460] : [110, CX, 530];
+      m.tree = { t: performance.now(), nodes: c.map(function (n, i) { return { tool: n[0], p: n[1], x: xs[i], y: i === 1 && c.length === 3 ? 95 : 130, win: i === 0 }; }) };
+    };
+    function lbl(s, px, py, c) { x.font = '600 21px "Instrument Sans", sans-serif'; x.textAlign = 'center'; x.fillStyle = c; x.fillText(s, px, py); }
+    m.draw = function (now) {
+      var st = m.st, e = (now - m.t0) / 1000; x.clearRect(0, 0, MW, MH);
+      var amp = st === 'listen' ? .45 + .45 * Math.abs(Math.sin(now / 120) * Math.sin(now / 310)) : st === 'speak' ? .3 + .3 * Math.abs(Math.sin(now / 100)) : 0;
+      if (st === 'think' && m.tree) {
+        var dec = (now - m.tree.t) > 1400; x.lineWidth = 2;
+        m.tree.nodes.forEach(function (n) {
+          x.globalAlpha = dec && !n.win ? .18 : .55; x.strokeStyle = dec && n.win ? L : V2;
+          x.beginPath(); x.moveTo(root[0], root[1]); x.quadraticCurveTo(n.x, (root[1] + n.y) / 2 + 50, n.x, n.y); x.stroke(); x.globalAlpha = 1;
+          if (sz < 8) { lbl(n.tool, n.x, n.y - 16, dec ? (n.win ? L : DIM) : T); if (!dec) lbl(Math.round(n.p * 100) + '%', n.x, n.y - 42, '#9A93C4'); }
+        });
+      }
+      for (var i = 0; i < N; i++) {
+        var p = parts[i], tx, ty, col = V2, al = .9;
+        if (st === 'sleep') { var q = sh.monS[i]; tx = q[0] + Math.sin(now / 700 + p.k * 9) * 2; ty = q[1] + Math.sin(now / 1100) * 4; col = i >= N - sh.nh ? L : (p.k < .5 ? V : V2); }
+        else if (st === 'listen' || st === 'speak') {
+          if (p.k < .16) { var u = p.k / .16; tx = 110 + u * 420; ty = 380 + Math.sin(u * 22 + now / 90) * (6 + 36 * amp); col = st === 'speak' ? P : L; }
+          else { var q2 = sh.monO[i], s2 = 1 + amp * .07; tx = CX + (q2[0] - CX) * s2; ty = 220 + (q2[1] - 220) * s2; col = i >= N - sh.nh ? L : (p.k < .5 ? V : V2); }
+        }
+        else if (st === 'think') {
+          if (!m.tree) { var ang = p.k * 6.283 + now / 900; tx = CX + Math.cos(ang) * (80 + 40 * Math.sin(now / 300 + p.k * 9)); ty = 220 + Math.sin(ang) * (80 + 40 * Math.cos(now / 350 + p.k * 7)); col = p.k < .2 ? L : V2; }
+          else {
+            if (p.fall) { p.vy += .35; p.x += p.vx; p.y += p.vy; p.a -= .014; if (p.a <= 0 || p.y > MH) { p.fall = 0; p.a = 1; p.f = 0; p.b = pick(); p.x = root[0]; p.y = root[1]; } x.globalAlpha = Math.max(p.a, 0); x.fillStyle = P; x.fillRect(p.x, p.y, sz, sz); continue; }
+            p.f += .007 + p.k * .007; if (p.f > 1) { p.f = 0; p.b = pick(); }
+            var n = m.tree.nodes[Math.min(p.b, m.tree.nodes.length - 1)], dec2 = (now - m.tree.t) > 1400;
+            if (dec2 && !n.win && p.f > .5) { p.fall = 1; p.vx = (Math.random() - .5) * 2; p.vy = -1; continue; }
+            var uu = p.f, cyp = (root[1] + n.y) / 2 + 50;
+            tx = (1 - uu) * (1 - uu) * root[0] + 2 * (1 - uu) * uu * n.x + uu * uu * n.x + Math.sin(p.k * 50 + now / 250) * 5;
+            ty = (1 - uu) * (1 - uu) * root[1] + 2 * (1 - uu) * uu * cyp + uu * uu * n.y + Math.cos(p.k * 50 + now / 250) * 5;
+            col = dec2 && n.win ? L : V2;
+          }
+        }
+        else if (st === 'act') { var q3 = sh.actT[i], lix = i - sh.frame.length, show = lix < 0 || Math.floor(lix / sh.per) < (m.shown || Math.floor(e / .45)); if (show) { tx = q3[0]; ty = q3[1]; col = lix < 0 ? '#5B3DE0' : L; } else { var ff = (now / 900 + p.k) % 1; tx = 30 + ff * (q3[0] - 30); ty = 220 + Math.sin(ff * 8 + p.k * 30) * 36 * (1 - ff) + (q3[1] - 220) * ff; col = V2; al = .6; } }
+        else if (st === 'ask') { var q4 = sh.qS[i]; tx = q4[0] + Math.sin(now / 400 + p.k * 7) * 3; ty = q4[1]; col = p.k < .7 ? A : V2; }
+        else if (st === 'block') { var q6 = sh.xS[i]; tx = q6[0] + (Math.random() - .5) * 3; ty = q6[1]; col = P; }
+        else { var q5 = e < 1.6 ? sh.chk[i] : sh.monS[i]; tx = q5[0]; ty = q5[1]; col = e < 1.6 ? L : (i >= N - sh.nh ? L : V2); }
+        p.vx += (tx - p.x) * .07; p.vy += (ty - p.y) * .07; p.vx *= .76; p.vy *= .76; p.x += p.vx; p.y += p.vy;
+        x.globalAlpha = al; x.fillStyle = col; x.fillRect(p.x, p.y, sz, sz);
+      }
+      x.globalAlpha = 1;
+      var mon = st === 'sleep' || st === 'listen' || st === 'speak' || (st === 'done' && e >= 1.6);
+      if (mon) {
+        x.lineWidth = sz > 6 ? 14 : 7; x.lineCap = 'round';
+        if (st === 'listen' || st === 'speak') { x.strokeStyle = st === 'speak' ? P : L; [278, 362].forEach(function (ex) { x.beginPath(); x.arc(ex, 225, 13 + amp * 5, 0, 6.283); x.stroke(); }); }
+        else { x.strokeStyle = T; [278, 362].forEach(function (ex) { x.beginPath(); x.arc(ex, 212, 21, .6, 2.54); x.stroke(); }); }
+      }
+      if (st === 'sleep') { [0, 1, 2].forEach(function (j) { var f = ((now / 2400) + j / 3) % 1; x.globalAlpha = 1 - f; x.font = '800 ' + (24 + j * 10) * (sz > 6 ? 1.6 : 1) + 'px "Bricolage Grotesque", sans-serif'; x.fillStyle = L; x.textAlign = 'left'; x.fillText('z', 450 + f * 55 + j * 15, 110 - f * 80); }); x.globalAlpha = 1; }
+    };
+    return m;
+  }
+
+  var hero = Monster(document.getElementById('monster'), small ? 420 : 620, 4);
+  var buddyCv = document.getElementById('buddyCv'), buddy = Monster(buddyCv, 240, 10);
+  var buddyBox = document.getElementById('buddy'), heroOn = true;
+
+  function loop(now) {
+    if (visible) {
+      drawSky(now);
+      if (heroOn) hero.draw(now);
+      if (buddyBox.classList.contains('on')) buddy.draw(now);
+    }
+    requestAnimationFrame(loop);
+  }
+  if (reduce) { drawSky(0); hero.draw(0); } else requestAnimationFrame(loop);
+
+  /* ---------- scripted demo: what the app really does ---------- */
+  var SCRIPTS = [
+    { match: /cafe|site|chrome|browser/i, tree: [['open_file', .86], ['open_app', .10], ['ask_user', .04]], steps: ['open_file'], said: 'Opened the cafe site in Chrome.', time: '1 step, 2.1 s' },
+    { match: /slide|deck|presentation|powerpoint/i, tree: [['make_presentation', .81], ['word_new_document', .12], ['ask_user', .07]], steps: ['make_presentation'], said: 'Built a three-slide deck on Meta AI and opened it in PowerPoint. Want speaker notes too?', time: '1 step, 6.4 s' },
+    { match: /close|clean|done/i, tree: [['close_all', .92], ['close_app', .06], ['ask_user', .02]], steps: ['close_all'], ask: 'Notepad has unsaved changes. Save it?', answer: 'Yes', said: 'Closed everything. Saved your note as haiku.txt in temp.', time: '1 step, 5.2 s' },
+    { match: /delete|format|wipe|erase/i, blocked: true, said: "I can't delete files. That tool doesn't exist, on purpose.", time: 'blocked on your PC' },
+    { match: /mute|volume|quiet/i, instant: true, said: 'Muted.', time: 'decided in 0.02 ms, before you finished talking' },
+    { match: /research|news|search/i, tree: [['web_research', .88], ['search_web', .09], ['ask_user', .03]], steps: ['web_research'], said: 'Here are the three biggest Meta AI updates this week, with sources.', time: '1 step, 7.9 s' },
+    { match: /haiku|notepad|write/i, tree: [['write_in_app', .84], ['open_app', .12], ['ask_user', .04]], steps: ['write_in_app'], said: 'Wrote it in a new Notepad tab and checked it landed. Want me to save it?', time: '1 step, 3.0 s' },
+    { match: /work|yesterday|resume/i, tree: [['recent_work', .9], ['ask_user', .1]], steps: ['recent_work'], said: 'Yesterday we built the cafe website and a Meta AI deck. Pick one up?', time: '1 step, 1.2 s' },
+    { match: /pdf/i, tree: [['export_pdf', .9], ['ask_user', .1]], steps: ['export_pdf'], said: 'Saved the Word document as a PDF and opened it.', time: '1 step, 2.4 s' }
+  ];
+  var tr = document.getElementById('transcript'), chips = document.getElementById('chips'), status = document.getElementById('status'), clock = document.getElementById('clock');
+  var timers = [];
+  function later(ms, fn) { timers.push(setTimeout(fn, reduce ? 0 : ms)); }
+  function bubble(cls, text) { var d = document.createElement('div'); d.className = 'b ' + cls; d.textContent = text; tr.appendChild(d); while (tr.children.length > 3) tr.removeChild(tr.firstChild); return d; }
+  function chip(text, ok) { var s = document.createElement('span'); s.textContent = text; if (ok) s.className = 'ok'; chips.appendChild(s); }
+  function run(text) {
+    text = (text || '').trim(); if (!text) return;
+    timers.forEach(clearTimeout); timers = []; tr.innerHTML = ''; chips.innerHTML = '';
+    var sc = SCRIPTS.find(function (s) { return s.match.test(text); }) ||
+      { tree: [['web_research', .6], ['open_app', .25], ['ask_user', .15]], steps: ['web_research'], said: 'Done. I looked it up and summed it up for you.', time: '2 steps, 6.0 s' };
+    hero.set('listen'); chime('wake'); status.textContent = 'Listening…'; clock.textContent = 'Awake';
+    bubble('you', text.charAt(0).toUpperCase() + text.slice(1));
+    if (sc.instant) {
+      later(700, function () { hero.set('done'); chime('done'); chip('instant command', true); chip(sc.time); status.textContent = 'Done'; });
+      later(900, function () { bubble('mon', sc.said); });
+      later(4200, rest); return;
+    }
+    if (sc.blocked) {
+      later(900, function () { hero.set('block'); chime('error'); chip('no such tool'); chip(sc.time); status.textContent = 'Blocked'; });
+      later(1400, function () { bubble('mon', sc.said); });
+      later(4800, rest); return;
+    }
+    later(1100, function () { hero.tree = null; hero.set('think'); hero.setTree(sc.tree); status.textContent = 'Deciding…'; });
+    later(3000, function () { hero.set('act'); hero.shown = 1; status.textContent = 'Working…'; sc.steps.forEach(function (s) { chip(s, true); }); });
+    for (var i = 2; i <= 5; i++) (function (n) { later(3000 + n * 380, function () { hero.shown = n; }); })(i);
+    var tEnd = 5200;
+    if (sc.ask) {
+      later(tEnd, function () { hero.set('ask'); status.textContent = 'Needs you'; bubble('mon', sc.ask); });
+      later(tEnd + 1500, function () { bubble('you', sc.answer); });
+      tEnd += 2300;
+    }
+    later(tEnd, function () { hero.set('done'); chime('done'); status.textContent = 'Done'; chip(sc.time); });
+    later(tEnd + 500, function () { hero.set('speak'); status.textContent = 'Speaking…'; bubble('mon', sc.said); });
+    later(tEnd + 3600, rest);
+  }
+  function rest() { hero.set('sleep'); status.textContent = 'Sleeping. Say "Hey Monster".'; clock.textContent = 'Asleep, still listening'; }
+
+  var form = document.getElementById('sayForm'), input = document.getElementById('sayInput');
+  form.addEventListener('submit', function (e) { e.preventDefault(); run(input.value || input.placeholder.replace(/^Try:\s*/, '')); input.value = ''; });
+  function wire(list, scroll) {
+    list.forEach(function (b) {
+      b.addEventListener('click', function () {
+        document.querySelectorAll('#tries button').forEach(function (o) { o.setAttribute('aria-pressed', 'false'); });
+        if (b.parentNode.id === 'tries') b.setAttribute('aria-pressed', 'true');
+        if (scroll) document.querySelector('.hero').scrollIntoView({ behavior: reduce ? 'auto' : 'smooth' });
+        run(b.textContent);
+      });
+    });
+  }
+  wire(document.querySelectorAll('#tries button'), false);
+  wire(document.querySelectorAll('#phrases button'), true);
+
+  /* ---------- talk to the website (browser speech, opt-in) ---------- */
+  var voiceBtn = document.getElementById('voiceBtn'), note = document.getElementById('voiceNote');
+  var SR = window.SpeechRecognition || window.webkitSpeechRecognition, rec = null, listening = false;
+  voiceBtn.addEventListener('click', function () {
+    if (!SR) { note.textContent = 'Your browser has no speech recognition. Try Chrome or Edge, or just type your request.'; return; }
+    if (listening && rec) { rec.stop(); return; }
+    rec = new SR(); rec.lang = navigator.language || 'en-US'; rec.interimResults = true; rec.maxAlternatives = 1;
+    var finalText = '';
+    rec.onstart = function () { listening = true; voiceBtn.setAttribute('aria-pressed', 'true'); hero.set('listen'); chime('wake'); status.textContent = 'Listening… say it now'; clock.textContent = 'Awake'; };
+    rec.onresult = function (e) {
+      var t = ''; for (var i = e.resultIndex; i < e.results.length; i++) { t += e.results[i][0].transcript; if (e.results[i].isFinal) finalText = t; }
+      input.value = t.replace(/^\s*(hey|hi|ok|a)[, ]+monster[,.!]?\s*/i, '');
+    };
+    rec.onerror = function (e) {
+      note.textContent = e.error === 'not-allowed' || e.error === 'service-not-allowed'
+        ? 'The microphone is blocked here. Allow it in the address bar, or open this page directly (the preview may block the mic). Typing works too.'
+        : 'Didn\'t catch that (' + e.error + '). Try again, or type it.';
+    };
+    rec.onend = function () {
+      listening = false; voiceBtn.setAttribute('aria-pressed', 'false');
+      var said = (finalText || input.value).replace(/^\s*(hey|hi|ok|a)[, ]+monster[,.!]?\s*/i, '').trim();
+      input.value = '';
+      if (said) run(said); else rest();
+    };
+    try { rec.start(); } catch (err) { note.textContent = 'Couldn\'t start the microphone. Type your request instead.'; }
+  });
+
+  /* ---------- the monster follows you down the page ---------- */
+  var line = document.getElementById('buddyLine');
+  function heroVisible(on) { heroOn = on; buddyBox.classList.toggle('on', !on && !reduce); }
+  var heroObs = new IntersectionObserver(function (es) { es.forEach(function (en) { heroVisible(en.isIntersecting); }); }, { threshold: .15 });
+  heroObs.observe(document.querySelector('.hero'));
+  var secObs = new IntersectionObserver(function (es) {
+    es.forEach(function (en) {
+      if (!en.isIntersecting) return;
+      var el = en.target, st = el.dataset.buddy;
+      buddy.tree = null;
+      if (st === 'think') buddy.setTree([['npu', .7], ['gpu', .2], ['cloud', .1]]);
+      buddy.set(st);
+      line.textContent = el.dataset.line;
+      if (st === 'block') chime('error');
+    });
+  }, { threshold: .45 });
+  document.querySelectorAll('[data-buddy]').forEach(function (s) { secObs.observe(s); });
+  buddyCv.addEventListener('click', function () { document.querySelector('.hero').scrollIntoView({ behavior: reduce ? 'auto' : 'smooth' }); setTimeout(function () { input.focus(); }, 500); });
+
+  /* ---------- copy buttons ---------- */
+  document.querySelectorAll('.copy').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      var code = btn.closest('.cmdrow').querySelector('code').textContent;
+      function ok() { btn.textContent = 'Copied'; btn.classList.add('done'); setTimeout(function () { btn.textContent = 'Copy'; btn.classList.remove('done'); }, 1600); }
+      if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(code).then(ok, function () { select(code); });
+      else select(code);
+      function select(c) { var r = document.createRange(); r.selectNodeContents(btn.closest('.cmdrow').querySelector('code')); var s = window.getSelection(); s.removeAllRanges(); s.addRange(r); btn.textContent = 'Press Ctrl+C'; }
+    });
+  });
+
+  /* ---------- install command per OS ---------- */
+  var CMDS = { win: ['Windows: paste into PowerShell', 'irm https://raw.githubusercontent.com/AndySync-09/lazy-monster/main/install.ps1 | iex'],
+               mac: ['macOS arrives next week', 'Mac version in final testing. Watch the GitHub repo (Watch > Custom > Releases) to hear the moment it ships.'] };
+  function showOS(os) {
+    document.getElementById('osLabel').textContent = CMDS[os][0];
+    document.getElementById('installCmd').textContent = CMDS[os][1];
+    var cp = document.querySelector('#install .cmdrow .copy'); if (cp) cp.style.visibility = os === 'mac' ? 'hidden' : 'visible';
+    document.querySelectorAll('.os-tabs button').forEach(function (b) { b.setAttribute('aria-selected', b.dataset.os === os); });
+  }
+  document.querySelectorAll('.os-tabs button').forEach(function (b) { b.addEventListener('click', function () { showOS(b.dataset.os); }); });
+  if (/Mac/i.test(navigator.platform || navigator.userAgent)) showOS('mac');
+
+  /* ---------- chip bars fill when they scroll into view ---------- */
+  var board = document.getElementById('chipboard');
+  function fill() { board.querySelectorAll('.track span').forEach(function (s) { s.style.width = s.dataset.w + '%'; }); }
+  if ('IntersectionObserver' in window && !reduce) {
+    new IntersectionObserver(function (es, ob) { es.forEach(function (en) { if (en.isIntersecting) { fill(); ob.disconnect(); } }); }, { threshold: .4 }).observe(board);
+  } else fill();
+
+  /* ---------- menu ---------- */
+  var header = document.querySelector('header'), menuBtn = document.getElementById('menuBtn');
+  menuBtn.addEventListener('click', function () { var open = header.classList.toggle('open'); menuBtn.setAttribute('aria-expanded', open); });
+  header.querySelectorAll('nav a').forEach(function (a) { a.addEventListener('click', function () { header.classList.remove('open'); menuBtn.setAttribute('aria-expanded', 'false'); }); });
+
+  later(900, function () { run('Open the cafe site in Chrome'); });
+})();
+</script>
+</body>
+</html>

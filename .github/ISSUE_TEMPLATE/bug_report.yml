@@ -1,0 +1,15 @@
+name: Bug report
+description: Something the monster did wrong, or did not do.
+labels: [bug]
+body:
+  - type: textarea
+    attributes: {label: What you said or typed, description: The exact request.}
+    validations: {required: true}
+  - type: textarea
+    attributes: {label: What happened, description: "Paste the console output of `monster run -v` or `monster text`."}
+    validations: {required: true}
+  - type: textarea
+    attributes: {label: What you expected}
+  - type: textarea
+    attributes: {label: Doctor output, description: "Paste the output of `.\\.venv\\Scripts\\monster.exe doctor`."}
+    validations: {required: true}

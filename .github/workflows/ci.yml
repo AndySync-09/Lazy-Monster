@@ -1,0 +1,35 @@
+name: ci
+on:
+  push:
+    branches: [main]
+  pull_request:
+jobs:
+  test:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest, ubuntu-latest]
+        python: ["3.12"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Linux audio/UI system libraries
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y libportaudio2 espeak-ng
+      - name: Install into venv
+        shell: bash
+        run: |
+          python -m venv .venv
+          if [ "$RUNNER_OS" = "Windows" ]; then PY=.venv/Scripts/python.exe; else PY=.venv/bin/python; fi
+          $PY -m pip install --upgrade pip
+          $PY -m pip install -e ".[dev]"
+          echo "PY=$PY" >> $GITHUB_ENV
+      - name: Tests
+        shell: bash
+        run: $PY -m pytest -q
+      - name: Grammar benchmark
+        shell: bash
+        run: $PY -m lazymonster.cli bench-text

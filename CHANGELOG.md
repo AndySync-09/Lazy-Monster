@@ -1,0 +1,160 @@
+# Changelog
+
+## 1.0.0: first release (Windows)
+Lazy-Monster's first public release, for Windows 10 and 11. Everything in 0.1 to 0.11 below, installable with one command:
+`irm https://raw.githubusercontent.com/AndySync-09/lazy-monster/main/install.ps1 | iex`
+
+## 0.11.0: macOS groundwork (unannounced preview)
+- **One command on a Mac:** `curl -fsSL https://raw.githubusercontent.com/AndySync-09/lazy-monster/main/install.sh | bash`. Installs to `~/.lazymonster` (no sudo), Python via Homebrew if needed, the OpenAI key into your Keychain, voice models, walks through the macOS privacy switches (`monster permissions`), learns your voice, and starts at login (LaunchAgent). Re-run to update; `uninstall.sh` removes it.
+- **Hearing on macOS:** streaming speech via sherpa-onnx (Zipformer, CPU, ~8% of a core; Moonshine's streaming build isn't published for macOS). Whisper re-hears each request with MLX on the Apple Silicon GPU (distil-large-v3) or faster-whisper on Intel Macs (small.en). The wake word and voice lock run on ONNX Runtime.
+- **Doing on macOS:** apps and files via `open`, windows and buttons via AppleScript and the Accessibility API, text pasted through the clipboard and read back to verify, Word-style documents saved as .docx, PDF export through Word for Mac, decks as .pptx. "Close everything" quits apps it launched itself (each app asks about unsaved work) and stops programs it ran.
+- Push-to-talk on macOS: Cmd+Shift+Space. No menu-bar icon yet (the window needs the main thread); quit with `monster service stop`.
+- Wake-word features fall back to ONNX Runtime anywhere OpenVINO is missing (checked equal to OpenVINO: embedding cosine 0.99997).
+
+## 0.10.1: one-command install and a website
+- **One command:** `irm https://raw.githubusercontent.com/AndySync-09/lazy-monster/main/install.ps1 | iex` in PowerShell. It finds or installs Python (winget, per user), installs to `%LOCALAPPDATA%\LazyMonster\app` in a private environment, asks for the OpenAI key (optional), downloads the voice models, offers to learn your voice, starts the background service, adds a Start menu entry and puts `monster` on your PATH. No admin rights. Re-running it updates and keeps settings, voiceprint and models.
+- `monster update` re-runs the installer; `uninstall.ps1` removes the program and asks before deleting your voice and settings.
+- The website lives in `docs/` for GitHub Pages: animated night sky, interactive particle monster demo, voice demo, companion monster, install, FAQ and comparison.
+
+## 0.10.0: knows your voice
+- **Sleep to orb.** "Hey Monster, sleep" (in any window mode) shrinks it to a small sleeping monster at the screen corner, still listening. "Hey Monster", the push-to-talk hotkey, or a click on the orb brings the full window back. Quit only from the tray.
+- **Voice lock.** `monster voice-enroll` (five sentences, about a minute) saves a local voiceprint (TitaNet-small speaker model via sherpa-onnx, on the CPU, ~50 ms per request). From then on it acts only on your voice: a TV, a video or someone else saying "Hey Monster, delete..." is ignored. Typed requests and push-to-talk always work. `monster voice-test` checks it; tray toggle "Voice lock".
+- **Push-to-talk.** Ctrl+Alt+Space (`push_to_talk`) starts listening from anywhere, no wake word, and interrupts it if it's talking. Also "Talk now" in the tray and a click on the monster.
+- Fix: `setup.ps1` stops the background copy before reinstalling (a locked `monsterw.exe` left 0.9 installs without `monster.exe`).
+
+## 0.9.0: hears you, not itself
+**Hearing**
+- The monster's own voice (and its echo) is cut out of the audio Whisper re-hears, so its greeting or questions can no longer end up in your request.
+- After a task it only keeps listening without "Hey Monster" when it actually asked you something (10 s). Otherwise room chatter and music are ignored until the wake word.
+- No reflexive "What next?" at the end of every answer.
+
+**Doing**
+- `open_file`: opens the pages, PDFs, decks and documents it made, in their default app or in Chrome/Edge/Word/PowerPoint. Documents and media only, from your own folders.
+- `export_pdf`: the current Word document as a PDF, opened.
+- `make_presentation`: a real .pptx built from an outline (title slide, clean layout), opened in PowerPoint.
+- `web_research`: an actual web search with sources (OpenAI web search), instead of answering from memory.
+
+**Thinking**
+- Acts first with sensible defaults and says what it chose; at most two questions per task; a step budget of 8 before it wraps up.
+- Approve running or installing once per project per session.
+- Hard or failing tasks (2 failures, or more than 6 steps) move to a stronger model (`escalation_model`, default `gpt-6-astra`); if that model is unavailable it carries on with the normal one.
+
+**Reliability**
+- Exactly one background copy: the single-instance check read the Windows error the wrong way (0.8 could run three), and `service install` now replaces running copies.
+- Many ways to say "go to sleep" ("you can sleep", "go sleep", "that's all", "stop listening"), plus a sleep tool the agent can use.
+- Finish text that arrived as raw JSON is spoken as a sentence.
+- Log readable in PowerShell; each task logs its time to first action; the window shows steps and seconds per task.
+
+## 0.8.0: tidy and remembers
+- **"Hey Monster, close everything"** (or "clean up", "I'm done") closes what the monster opened this session: app windows, the Notepad tabs it wrote in (only those, never your other tabs), Word documents, VS Code windows and programs it ran. Things it did not open are never touched.
+- **Unsaved work: it asks.** "Notepad has unsaved changes. Should I save it? Tell me a name or a place, or say no." Say a name ("save it as Bangalore poem"), a place ("on the desktop"), both, or "no". If you just say yes or don't answer, it saves to your default folder, `C:\temp` (`default_save_dir`), with a suggested name, and tells you exactly where.
+- **Remembers your work.** Every finished task goes into a local journal (`%APPDATA%\lazymonster\journal.jsonl`, with files it saved). On the first "Hey Monster" after starting, it says: "Welcome back, Andy. Recently we worked on: a snake game in VS Code, and a haiku about Bangalore traffic. Want to pick one of those up, or start fresh?" Answer naturally; "the snake game" resumes it. Ask "what did we work on?" any time.
+- Spoken file paths are readable: "haiku.txt in temp" instead of a raw path.
+
+## 0.7.0: always there
+- **Background mode.** `monster service install` starts Lazy-Monster at sign-in with no console window (`monsterw.exe`), hidden until you say "Hey Monster". The window appears on wake and hides again after 45 s asleep (`hide_after`). One copy per user. Output goes to `%APPDATA%\lazymonster\monster.log`. Also `service uninstall | start | stop | status`.
+  A true Windows service runs in session 0 with no microphone or desktop, so this uses the per-user sign-in entry instead (no admin rights).
+- **Greets you by name.** After a bare "Hey Monster" it says "Hi Andy, how can I help?" (first name from your Windows account; override with `user_name`). If you keep talking straight after the wake word, it skips the greeting and just listens.
+- In the background, "Hey Monster, sleep" and the window's close button hide it and keep listening; quitting is in the tray ("Quit Lazy-Monster") or `monster service stop`.
+
+## 0.6.0: a real conversation
+- **One conversation state machine** (`conversation.py`): sleeping, listening, thinking, acting, speaking, awaiting your reply. The window, sounds, microphone gating and wake-word handling all follow it, replacing seven separate flags that drifted out of sync.
+- **Turn-taking.** Pauses no longer cut your request in half: lines are joined into one turn until you have been quiet for 0.9 s (`turn_delay`). Instant commands still fire at once, even across a pause ("open ... notepad"). Whisper re-hears the whole turn.
+- **Conversation memory.** One-word replies ("snake", "yes", "the second one") go to the agent while you are mid-conversation instead of being dropped.
+- **Wake word by state.** Sleeping: wakes. Speaking: barge-in, ignoring the first moment of its own voice and requiring a confident score. Listening, thinking or working: ignored, with no beep and no re-arm.
+- **Three sounds only:** a soft wake chime, a done chime, an error tone (generated in memory). No other beeps.
+- **Talks like a person:** a short "On it" when a task starts, one progress line if a task runs past 10 s, short answers with one useful offer, no em dashes or lists.
+- **Chat view:** your turns and the monster's replies as bubbles under the monster, with each task's steps folded into its reply; a speaking animation.
+- Fixes: "Code" in a VS Code title no longer counts as a sensitive window; project environments live in `%LOCALAPPDATA%\lazymonster\venvs` (outside OneDrive, which locked files during creation) and are created from the base Python, with the real error shown if creation fails.
+
+## 0.5.5
+- Fix: the wake word loaded on the NPU but never fired. The mel front end computes log(max(x, 1e-10)); in the NPU's FP16, 1e-10 underflows to zero and log(0) is -inf, so every feature was garbage. The front end (tiny) now runs on the CPU; the embedding network runs on the NPU only if it reproduces the CPU output (cosine >= 0.99), otherwise it falls back and says why.
+- Detection threshold capped at 0.85 (two consecutive hits still required).
+- `monster wake-test`: live score meter, peak score, and a suggested `wake_sensitivity` if it misses you.
+
+## 0.5.4
+- Whisper: generation is capped at 96 tokens (commands are short), and warm-up uses quiet noise instead of digital silence, which made Whisper hallucinate long output and overflow the NPU's fixed decoder cache. The vocabulary prompt now resets per device, so the GPU fallback keeps it (0.5.3 dropped it after the NPU attempt).
+
+## 0.5.3
+- Whisper on the NPU: the NPU pipeline has a fixed-size decoder window and the 60-word vocabulary prompt overflowed it (`roi_end <= max_dim`). Warm-up now shrinks the prompt to 12 words, then drops it, before falling back to the GPU. `monster models` reports which it used.
+
+## 0.5.2
+- Wake word on the NPU: the NPU compiler rejected a `Maximum` op in the mel front end (`failed to legalize IE.Maximum`), so everything fell back to the GPU. The graph is now rewritten to NPU-friendly ops (Clamp / Relu arithmetic, bit-identical on CPU), and each feature model picks its own device, so the embedding network stays on the NPU even if the front end cannot.
+- When Whisper falls back from the NPU, the reason is printed.
+
+## 0.5.1
+- **The monster can run the code it writes.** New `code_run` and `code_install` tools. Each project gets its own virtual environment inside `Documents\LazyMonster\code\<project>\.venv`; packages never touch Lazy-Monster's or the system's Python.
+- Safety: before running or installing, the monster asks you out loud and waits for your "yes" (decided locally, not by the model). It only runs `.py` files it wrote itself and that are unchanged since (tracked by hash in `.lazymonster.json`), with a fixed interpreter and no arguments. Package names must be plain PyPI names (no URLs, paths or pip flags). Terminals stay blocked.
+- Crashes come back to the agent with the error; a missing package is suggested for `code_install`.
+
+## 0.5.0: the monster feels alive
+- **Personal "Hey Monster" wake word on the NPU.** `monster wake-train` records ~15 of your "Hey Monster"s plus a little normal talk and room noise, adds synthetic Kokoro voices (US, UK and Indian English, several speeds) and look-alike phrases ("hey mister", "a monster movie"), and trains a small detector on top of openWakeWord's speech features. The features run through OpenVINO at fixed shapes on the Intel NPU. In a synthetic test with voices it never trained on: recall 100%, no false wakes on look-alike phrases at the chosen threshold. Your real-world numbers print after training.
+- **CPU transcriber sleeps while idle.** With the NPU wake word, Moonshine only listens after "Hey Monster" (and during follow-ups and tasks). Whisper still re-hears the full request, including the first word.
+- **Barge-in.** Say "Hey Monster" while it is talking, click the monster, or use the tray, and it stops mid-sentence and listens.
+- **Tray icon.** Show/hide, pause listening, stop talking, pick the voice (Heart, Bella, Nicole, Emma, and two Indian English voices), open the output folder, settings and history, sleep. Voice choice persists in `settings.toml`.
+
+## 0.4.1
+- Fix: the window hung at start. pywebview publishes every public attribute of the page API to JavaScript and walked the native window object recursively. The API now exposes only `submit`, `sleep` and `compact` (also closes a path from the page to engine internals).
+- Model downloads retry with backoff and end with a clear message (with a mirror hint) instead of a traceback; `monster models` says when it is compiling for the NPU.
+
+## 0.4.0: the monster gets a face and a local voice
+- **UI** (`monster` or `monster ui`): an always-on-top window with a particle monster driven by real events. It sleeps, listens (waveform follows your mic), grows a decision tree from the agent's reported candidate actions (blocked branches turn red and wither, the chosen one turns lime), writes, asks, and confirms. Transcript, verified steps, Approve/Cancel, one-tap "yes" to the suggested next step, and a text box.
+- **Local speech, two passes:** Moonshine streaming for the wake phrase and instant commands; every agent request is then re-heard by distil-Whisper large-v3 (INT8) through OpenVINO GenAI on the **NPU** (GPU/CPU fallback), with a vocabulary prompt (Bangalore-area names, your apps, your `vocabulary`).
+- **Local voice:** Kokoro-82M (Apache 2.0), female voice `af_heart` by default, sentence-streamed so it starts talking in under a second. Runs on the CPU. OpenAI and Windows voices remain as options.
+- **Exact text:** text is pasted line by line through the clipboard (your clipboard is restored) instead of simulated keystrokes, which garbled text in Windows 11 Notepad.
+- **Self-check:** every write reads the document back and reports verified or MISMATCH; Word checks the document text; code files are re-read and Python is syntax-checked. New `read_text` tool.
+- **Window targeting by handle:** the monster types into the window it opened or focused, never a look-alike.
+- **Speed:** `write_in_app` does open + new document + paste + verify in one step; `reasoning_effort = "low"` by default (dropped automatically if unsupported).
+- **Cross-platform groundwork:** macOS/Linux executor (open apps and URLs, type/keys via System Events or xdotool on X11, volume, media, lock, files, VS Code). Window reading, clicking and Office stay Windows-only for now. CI runs on Windows, macOS and Ubuntu.
+- `monster models` downloads and prepares the local models and reports where they run.
+
+## 0.3.1
+- Fix: after "Hey Monster" + pause, a long command was dropped if it finished after the listening window. The window now applies to when you start speaking.
+- Wake phrase also accepts "You monster", "Me monster", "Here, monster" at the start of a line (common mishearings).
+
+## 0.3.0: the monster talks back
+- Spoken replies (OpenAI `gpt-4o-mini-tts`, falling back to the Windows voice; `--quiet` or `voice = "off"` to silence). The mic is muted while it speaks.
+- After every task it says what it did and offers the most useful next step ("Want me to save it?"). Say "yes" to do it, "no" to move on, or give a new task.
+- When stuck or blocked it asks you a specific question instead of giving up; two failures in a row force a question.
+- "Write ..." now goes to the agent (it writes content); "type ..." still types your words verbatim.
+- Safety after a field incident (typing into a restored Notepad tab holding recovery codes):
+  - Sensitive windows (passwords, recovery codes, keys, tokens, .env, wallets, banking) are never typed into, clicked in or read, and their titles are redacted before reaching the model.
+  - Ownership: the monster only edits new/untitled documents or documents you named; otherwise it opens a new one (Ctrl+N) or asks.
+- `monster say` tests the voice.
+
+## 0.2.4
+- "Hey Monster, sleep" (also exit, quit, goodnight, bye) closes Lazy-Monster. Putting the PC to sleep now needs "put the computer to sleep".
+- Speech heard while a task is running goes to that task, no wake phrase needed ("save it" while a save dialog is up).
+- New `ask_user` tool: the agent asks instead of guessing on choices that lose work, and waits for your answer.
+- `click` reports the button it pressed even when the dialog closes.
+
+## 0.2.3
+- Fix: `click` crashed (slot named `name` clashed with `Intent.make`), which broke clicking dialog buttons such as Save.
+- Fix: `close_app` now resolves app names the same way as `open_app` ("Notepad" works).
+- A malformed tool call now returns an error to the agent instead of ending the task.
+
+## 0.2.2
+- Follow-ups: after a task, the monster listens 15 s without the wake phrase, and the agent remembers the session for 3 minutes ("Hey Monster, open Notepad and type hello" ... "save it").
+- `open_app` reports the focused window, saving the agent two or three round trips per task.
+- Silenced the remaining pywinauto COM warning.
+
+## 0.2.1
+- Wake phrase: accept "A monster" / "Hay monster" (common transcriptions of "Hey"), and the bare name at the start of a line.
+- "Cancel it", "stop it", "stop now" cancel a running task.
+- Wake window after a lone "Hey Monster" extended to 8 s; one-word leftovers are not sent to the agent.
+- Silenced the pywinauto COM threading warning.
+
+## 0.2.0: the monster gets hands
+- Agent loop with tool calling: sees tool results and window contents, works until done, and can be cancelled by voice ("Hey Monster, stop") or Ctrl+C.
+- New tools: list/focus/read windows, click, press keys (allowlisted), VS Code projects with live-streamed files, visible Word typing.
+- Local guards for input targets, risky clicks, banned shortcuts and code paths.
+- NPU ready: OpenVINO bundled, `monster npu` detects and benchmarks NPU/GPU/CPU, `accelerator` setting.
+- `monster do <task>` runs one task and shows each step.
+
+## 0.1.0: first preview
+- "Hey Monster" wake phrase, spotted in the on-device streaming transcript.
+- Instant lane: 25 typed commands with semantic endpointing (fires on a stable partial, not a silence timeout).
+- Agent lane: OpenAI planner with a forced `submit_plan`, local validation, `$N` step references, and Word automation via COM.
+- Safety: typed allowlist, local confirmation, `Documents\LazyMonster` sandbox, no overwrite.
+- CLI: `run`, `text`, `plan`, `doctor`, `apps`, `bench-text`, `record`, `bench-audio`.
+- Setup enforces a project virtual environment.

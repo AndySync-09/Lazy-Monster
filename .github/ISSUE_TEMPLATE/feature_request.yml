@@ -1,0 +1,15 @@
+name: Feature request
+description: Something new the monster should learn to do.
+labels: [enhancement]
+body:
+  - type: textarea
+    attributes: {label: What you want to say, description: "Example requests, e.g. \"Hey Monster, ...\""}
+    validations: {required: true}
+  - type: textarea
+    attributes: {label: What should happen, description: Which apps or files are involved.}
+    validations: {required: true}
+  - type: checkboxes
+    attributes:
+      label: Safety
+      options:
+        - label: This does not need a shell, deletion, sending messages or purchases (see SECURITY.md).
