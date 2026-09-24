@@ -27,7 +27,7 @@
   <a href="#three-engines-one-monster"><b>How it thinks</b></a> &nbsp;·&nbsp;
   <a href="#brain-break"><b>Brain-Break</b></a> &nbsp;·&nbsp;
   <a href="#models-that-ship"><b>Models</b></a> &nbsp;·&nbsp;
-  <a href="https://andysync-09.github.io/lazy-monster/"><b>Website</b></a>
+  <a href="https://lazymonster.space"><b>lazymonster.space</b></a>
 </p>
 
 <!-- Demo video: drag docs/media/lazy-monster-16x9.mp4 into this README in GitHub's editor and paste the
@@ -158,6 +158,10 @@ Details: [SECURITY.md](SECURITY.md).
 ## The fun part
 
 It's a monster. It sleeps, snores little Zs, yawns, stretches and peeks at you. Its eyes follow your pointer. When it works, it dissolves into a particle monster that thinks in branches and types in the air, then snaps back and hops. It wears Diwali lights in October, a winter hat in December and a cricket cap in IPL season. You can make it walk along your taskbar while it naps. None of this is necessary. All of it is on purpose.
+
+## The website
+
+[lazymonster.space](https://lazymonster.space) is served by GitHub Pages from `docs/`. Edit `site/index.html`, then build the published page with `python tools/build_site.py` (it packs the page into a small JavaScript loader and keeps the title and social-preview tags as plain HTML).
 
 ## Contributing
 
