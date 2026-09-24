@@ -1278,3 +1278,14 @@ def test_jev_down_means_business_as_usual(monkeypatch):
     def boom(*a, **k): raise requests.exceptions.ConnectTimeout()
     monkeypatch.setattr(requests, "post", boom)
     assert jev.Jev().addressed("hello") is None
+
+
+def test_voice_lock_helper_fails_open():
+    import numpy as np
+    from lazymonster.voicelock import VoiceLockProcess
+    v = VoiceLockProcess.__new__(VoiceLockProcess)
+    class Dead:
+        def poll(self): return 1
+    import threading
+    v.p, v.timeout, v._lock = Dead(), 0.1, threading.Lock()
+    assert v.check(np.ones(16000, dtype=np.float32)) == (True, -1.0)

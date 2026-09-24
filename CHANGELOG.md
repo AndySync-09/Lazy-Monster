@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.0.3
+- **Fix: the background monster quit right after starting** (`running: 0`, so neither "Hey Monster" nor Ctrl+Alt+Space answered). The voice lock's speaker model (sherpa-onnx) ships its own onnxruntime DLL, and loading it into the same process as the Kokoro voice's onnxruntime crashes on Windows without a Python error. The voice lock now runs in its own small helper process and answers over a pipe; if the helper is slow or gone, it lets you through rather than locking you out.
+- Native crashes now leave a trace in the log (faulthandler), and startup logs each step (microphone, voice lock, push-to-talk, wake word), so `monster service status` shows where it stopped.
+- `monster doctor` checks that exactly one background monster is running.
+
 ## 1.0.2: Jev, done right
 - **Jev is a decider, not a brain.** 1.0.1 treated Jev as a chat model. It isn't: TypeSafe's Jev answers typed questions (yes/no probability, a choice, a score) through its System One API (`POST https://api.typesafe.ai/v1/systemone`). The brain stays OpenAI or Claude; with `decider = "jev"` Jev makes the quick calls around it:
   - **"Was that meant for me?"** In the follow-up window (no wake word), speech that isn't addressed to the monster is ignored: phone calls, TV, talking to someone else.

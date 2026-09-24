@@ -86,3 +86,92 @@ def load_lock() -> Optional[VoiceLock]:
     v = VoiceLock()
     v.load()
     return v
+
+
+# ---- running the check in its own process -------------------------------------------------------
+# sherpa-onnx ships its own onnxruntime.dll. Loading it into a process that already has the
+# pip onnxruntime (the Kokoro voice) or OpenVINO can crash the whole app on Windows with no
+# Python traceback: the background monster just vanished right after loading Whisper.
+# So the voice lock lives in a small helper process and answers over a pipe.
+import json as _json
+import os as _os
+import subprocess as _sp
+import sys as _sys
+import threading as _th
+
+
+def serve() -> None:
+    v = VoiceLock()
+    if not v.load():
+        _sys.stdout.write("NOPRINT\n"); _sys.stdout.flush()
+        return
+    out, inp = _sys.stdout.buffer, _sys.stdin.buffer
+    out.write(f"READY {v.threshold:.3f}\n".encode()); out.flush()
+    while True:
+        hdr = inp.read(4)
+        if len(hdr) < 4:
+            return
+        n = int.from_bytes(hdr, "little")
+        audio = np.frombuffer(inp.read(n), dtype=np.float32)
+        try:
+            ok, score = v.check(audio)
+        except Exception:
+            ok, score = True, -1.0
+        out.write((_json.dumps({"ok": bool(ok), "score": float(score)}) + "\n").encode()); out.flush()
+
+
+class VoiceLockProcess:
+    """Same check() as VoiceLock, answered by the helper process. If the helper
+    is slow or gone, it answers "yes" rather than locking you out."""
+
+    def __init__(self, timeout: float = 3.0):
+        flags = 0x08000000 if _os.name == "nt" else 0              # CREATE_NO_WINDOW
+        self.p = _sp.Popen([_sys.executable, "-m", "lazymonster.voicelock", "--serve"], stdin=_sp.PIPE,
+                           stdout=_sp.PIPE, stderr=_sp.DEVNULL, creationflags=flags)
+        first = self.p.stdout.readline().decode(errors="replace").strip()
+        if not first.startswith("READY"):
+            self.close()
+            raise RuntimeError(f"voice lock helper did not start ({first or 'no output'})")
+        self.threshold = float(first.split()[1])
+        self.timeout, self._lock = timeout, _th.Lock()
+
+    def check(self, audio: np.ndarray):
+        a = np.asarray(audio, dtype=np.float32)
+        if len(a) < 16000 * 0.6:
+            return True, -1.0
+        with self._lock:
+            if self.p.poll() is not None:
+                return True, -1.0
+            box = {}
+
+            def read():
+                box["line"] = self.p.stdout.readline()
+            t = _th.Thread(target=read, daemon=True)
+            try:
+                data = a.tobytes()
+                self.p.stdin.write(len(data).to_bytes(4, "little") + data)
+                self.p.stdin.flush()
+                t.start()
+                t.join(self.timeout)
+            except Exception:
+                return True, -1.0
+            if "line" not in box or not box["line"]:
+                return True, -1.0
+            r = _json.loads(box["line"])
+            return bool(r["ok"]), float(r["score"])
+
+    def close(self):
+        try:
+            self.p.kill()
+        except Exception:
+            pass
+
+
+def load_lock_process():
+    if not print_path().exists():
+        return None
+    return VoiceLockProcess()
+
+
+if __name__ == "__main__" and "--serve" in _sys.argv:
+    serve()

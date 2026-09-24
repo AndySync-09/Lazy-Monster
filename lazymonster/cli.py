@@ -163,14 +163,16 @@ def _start_voice(cfg, a, engine, apps, speaker, conv, on_partial=None, on_level=
         if on_partial:
             on_partial(lid, t)
 
+    status("opening the microphone…")
     mic = open_mic(cfg.model, cfg.update_interval, keyterms, part, comp, device=getattr(a, "device", None))
     gate.mic = mic
     mic.start()
     info["lock"] = "voice lock off"
     if cfg.voice_lock:
         try:
-            from .voicelock import load_lock
-            lock = load_lock()
+            from .voicelock import load_lock_process
+            status("starting the voice lock (separate helper process)…")
+            lock = load_lock_process()
             if lock is None:
                 status("voice lock: not enrolled (monster voice-enroll) - anyone can command it")
             else:
@@ -294,6 +296,8 @@ def _background_io():
     # BOM on a new file so PowerShell shows the symbols correctly
     f = open(log, "a", encoding="utf-8-sig" if not log.exists() or log.stat().st_size == 0 else "utf-8", buffering=1)
     sys.stdout = sys.stderr = f
+    import faulthandler
+    faulthandler.enable(file=f)          # a native crash still leaves a trace in the log
     print(f"\n--- Lazy-Monster {__version__} background start {time.strftime('%Y-%m-%d %H:%M:%S')} ---")
 
 
@@ -515,7 +519,8 @@ def cmd_service(a, cfg):
         if log.exists():
             lines = log.read_text(encoding="utf-8-sig", errors="replace").splitlines()
             start = max((i for i, l in enumerate(lines) if "background start" in l), default=0)
-            keys = ("wake word", "push-to-talk", "voice lock", "accurate speech", "error", "Error", "Traceback", "off (", "taken")
+            keys = ("wake word", "push-to-talk", "voice lock", "accurate speech", "microphone", "error", "Error",
+                    "Traceback", "Fatal", "off (", "taken")
             recent = [l for l in lines[start:] if any(k in l for k in keys)][-12:]
             if recent:
                 print("  since the last start:")
@@ -970,6 +975,11 @@ def cmd_doctor(a, cfg):
     line(wake_model().exists(), "Hey Monster wake-word model trained", "run: monster wake-train")
     from .voicelock import print_path
     line(print_path().exists(), "voice lock enrolled", "run: monster voice-enroll")
+    if os.name == "nt" or sys.platform == "darwin":
+        from . import service
+        if service.installed():
+            n = len(service.running())
+            line(n == 1, "background monster running", f"{n} running; see: monster service status" if n != 1 else "")
     if not IS_MAC:
         from . import npu
         devs = npu.devices()
