@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.3.0: reminders that come to you
+- **Reminders.** "Hey Monster, remind me about the cafe website meeting at 8 AM" (also "in 20 minutes", "tomorrow morning", "tonight at 7"). At that time the monster wakes up by itself, pops up, sends a tray notification, says it, and suggests up to three things it could do next from your recent work (open the project, update the code, draft an email). It waits for your pick ("the last one") and does nothing until you choose; if you're away (brushing your teeth), it checks once more five minutes later. "What are my reminders", "cancel the cafe reminder", "snooze for 10 minutes". A reminder missed while the PC was off still fires up to 3 hours late.
+- **Email drafts.** `draft_email` opens a filled-in draft in your mail app. You review and send; the monster never sends.
+- **Your own voice, recognised better.** The voice lock now listens only to the speech (not the silence around it), compares against each of your enrollment takes, and lowers the bar for short commands (measured: "mute" in the enrolled voice scored 0.62-0.70 against a 0.72 bar, so it was wrongly refused). Push-to-talk requests teach it how you sound on your mic and in your room (last 20 kept). Enrolment thresholds are now 0.45-0.68.
+- **Interrupting fixed.** It no longer depends on the voice lock passing on mixed audio. While the monster talks, the mic hears its voice at a steady ratio; when you talk over it the mic gets much louder than its echo explains, and it stops. The voice lock only vetoes voices that are clearly someone else (a TV).
+- **Changing models fixed.** A new model or brain is tried first (it must answer and use tools); if it can't, the monster keeps the one that works and says why ("gpt-5.4-pro didn't work … I kept gpt-5.4-mini"). The model list hides models that can't drive apps (audio, realtime, embeddings, instruct, codex).
+
 ## 1.2.1
 - Fix: the settings panel shrank into the sleeping orb after a few seconds. While settings are open (or you're typing in the box) the window stays full size; it goes back to the orb a few seconds after you close them.
 - **Save & close** at the bottom of settings: saves anything still typed in (a key, the local address, the push-to-talk key, a picked brain) and confirms.

@@ -411,7 +411,7 @@ footer{background:var(--ink);color:#D9D7EA;padding-block:64px 40px;position:rela
       <button type="button">Open the cafe site in Chrome</button><button type="button">Make 3 slides about Meta AI</button>
       <button type="button">Research the latest Meta AI news</button><button type="button">Close everything</button>
       <button type="button">Write a haiku in Notepad</button><button type="button">Mute</button>
-      <button type="button">What did we work on yesterday?</button><button type="button">Save it as a PDF</button><button type="button">Delete my Downloads folder</button>
+      <button type="button">What did we work on yesterday?</button><button type="button">Save it as a PDF</button><button type="button">Remind me about the cafe meeting at 8 AM</button><button type="button">Delete my Downloads folder</button>
     </div>
   </section>
 
@@ -473,6 +473,7 @@ footer{background:var(--ink);color:#D9D7EA;padding-block:64px 40px;position:rela
       <details><summary>How do I change the brain or model?</summary><p>Open the gear in the monster's window and pick OpenAI, Claude or a local model; the model list comes live from your key, so new models appear on their own. Or just say "Hey Monster, switch to Claude" or "use the bigger brain".</p></details>
       <details><summary>Which AI does it use?</summary><p>Your choice of brain: OpenAI, Claude or a local model. Add Jev by TypeSafe and it makes the split-second calls around the brain: was that meant for me, which tool, did you say yes. Speech, voice and the wake word always run on your PC.</p></details>
       <details><summary>Can I use my own voice models?</summary><p>Yes. Pick a built-in voice with "monster voices", or point it at your own Kokoro-format voice files, your own Whisper export, and retrain the wake word on your voice. The repo's docs/VOICES.md shows how.</p></details>
+      <details><summary>Can it remind me?</summary><p>Yes. "Remind me about the cafe meeting at 8 AM" and at 8 the monster wakes up on its own, tells you, and suggests what it could do next, like opening the project or drafting an email. It always asks first.</p></details>
       <details><summary>How do I update or remove it?</summary><p>Run the install command again, or say "monster update" in a terminal. To remove it, run uninstall.ps1 from %LOCALAPPDATA%\LazyMonster\app. It asks before deleting your voice and settings.</p></details>
       <details><summary>Do I need an NPU?</summary><p>No. With an Intel AI PC the wake word runs on the NPU and saves battery. Without one, it runs on the CPU.</p></details>
       <details><summary>Does it work on a Mac?</summary><p>Next week, for Apple Silicon and Intel Macs. Watch the GitHub repo for releases and you'll hear the moment it lands.</p></details>
@@ -705,6 +706,7 @@ footer{background:var(--ink);color:#D9D7EA;padding-block:64px 40px;position:rela
     { match: /slide|deck|presentation|powerpoint/i, tree: [['make_presentation', .81], ['word_new_document', .12], ['ask_user', .07]], steps: ['make_presentation'], said: 'Built a three-slide deck on Meta AI and opened it in PowerPoint. Want speaker notes too?', time: '1 step, 6.4 s' },
     { match: /close|clean|done/i, tree: [['close_all', .92], ['close_app', .06], ['ask_user', .02]], steps: ['close_all'], ask: 'Notepad has unsaved changes. Save it?', answer: 'Yes', said: 'Closed everything. Saved your note as haiku.txt in temp.', time: '1 step, 5.2 s' },
     { match: /delete|format|wipe|erase/i, blocked: true, said: "I can't delete files. That tool doesn't exist, on purpose.", time: 'blocked on your PC' },
+    { match: /remind/i, instant: true, said: 'Okay. At 8 AM I\'ll remind you, and suggest opening the cafe project or drafting the agenda email.', time: 'saved on your PC, it comes to you' },
     { match: /mute|volume|quiet/i, instant: true, said: 'Muted.', time: 'decided in 0.02 ms, before you finished talking' },
     { match: /research|news|search/i, tree: [['web_research', .88], ['search_web', .09], ['ask_user', .03]], steps: ['web_research'], said: 'Here are the three biggest Meta AI updates this week, with sources.', time: '1 step, 7.9 s' },
     { match: /haiku|notepad|write/i, tree: [['write_in_app', .84], ['open_app', .12], ['ask_user', .04]], steps: ['write_in_app'], said: 'Wrote it in a new Notepad tab and checked it landed. Want me to save it?', time: '1 step, 3.0 s' },

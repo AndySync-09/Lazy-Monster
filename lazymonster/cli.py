@@ -152,6 +152,7 @@ def _start_voice(cfg, a, engine, apps, speaker, conv, on_partial=None, on_level=
     gate = conv.gate
     tap = AudioTap(device=getattr(a, "device", None)).start()
     conv.tap = tap                                     # its own voice is cut out of what Whisper hears
+    tap.listeners.append(conv.on_audio)                # talk over the monster to interrupt it
     det_ref = {}
     if cfg.stt_refine:
         try:
@@ -195,10 +196,10 @@ def _start_voice(cfg, a, engine, apps, speaker, conv, on_partial=None, on_level=
                 status("voice lock: not enrolled (monster voice-enroll) - anyone can command it")
             else:
                 engine.verify = lambda t0: lock.check(tap.slice(t0))
+                engine.learn_voice = lambda t0: lock.learn(tap.slice(t0))   # push-to-talk turns teach it your voice
                 info["lock"] = "voice lock on"
                 info["lock_obj"] = lock
                 conv.lock = lock
-                tap.listeners.append(conv.on_audio)
                 status("voice lock: on (only your voice; typed requests and push-to-talk always work)")
         except Exception as e:
             status(f"voice lock off ({type(e).__name__}: {str(e)[:100]})")
@@ -337,6 +338,9 @@ def cmd_run(a, cfg):
           f"{brain_label(cfg, engine.agent_enabled)}"
           f" · voice={cfg.voice} · {'DRY RUN' if a.dry_run else 'LIVE'}")
     mic, tap, _, _, _ = _start_voice(cfg, a, engine, apps, speaker, conv, status=lambda m: print("  " + m, flush=True))
+    from .reminders import Scheduler
+    import threading as _th
+    Scheduler(lambda r, late: _th.Thread(target=conv.remind, args=(r, late), daemon=True).start()).run(stop)
     print("Say “Hey Monster, …”   Say “Hey Monster, sleep” to exit.")
     try:
         while not stop.is_set():
@@ -454,6 +458,20 @@ def cmd_ui(a, cfg):
         api._ctl = SettingsCtl(cfg, engine, conv, speaker, bus, det_ref,
                                {"lock": info.get("lock_obj"), "verify": engine.verify}, refresh_status)
         engine.brain.on_change = refresh_status
+
+        def on_remind(r):
+            bus.set_orb(False)
+            if bus.window is not None:
+                bus.window.show()
+            tray = held.get("tray")
+            if tray is not None and getattr(tray, "icon", None) is not None:
+                try:
+                    tray.icon.notify(r["what"], "Lazy-Monster reminder")
+                except Exception:
+                    pass
+        conv.on_remind = on_remind
+        from .reminders import Scheduler
+        Scheduler(lambda r, late: threading.Thread(target=conv.remind, args=(r, late), daemon=True).start()).run(stop)
         conv.set("sleeping", 'say "Hey Monster" or type below')
         threading.Thread(target=_update_check, args=(bus,), daemon=True).start()
 

@@ -39,6 +39,9 @@ Guidelines:
 - PDFs from Word: export_pdf. Presentations: make_presentation with a full outline (never type into PowerPoint).
 - Research, news or facts: web_research, then tell the user the answer briefly and mention it came from the web.
 - If the user wants you to stop, rest or go to sleep: go_to_sleep.
+- Reminders: set_reminder (you'll wake up and suggest next steps at that time), list_reminders, cancel_reminder.
+- Email: draft_email opens a draft in their mail app. You never send email; say they can review and send it.
+- When you offered numbered options and the user picks one ("the first one", "draft the email"), do exactly that.
 - If open_app lands on an existing document, press ctrl+n for a new one before typing. Never edit documents the user did not mention.
 - Be efficient: open_app already reports the focused window; type or click straight away when it is the right one. Use read_window only when you need to see controls.
 - Follow-ups like "save it" or "make it longer" refer to what you just did in this conversation.
@@ -183,6 +186,23 @@ class Agent:
                 hist = hist[1:]
             return [{"role": "system", "content": self._system()}] + hist + [{"role": "user", "content": task}]
         return [{"role": "system", "content": self._system()}, {"role": "user", "content": task}]
+
+    def suggest(self, about: str) -> list:
+        """Up to three things the monster could do next, for a reminder that just went off."""
+        from . import journal
+        ctx = journal.context() if self.journal else ""
+        msgs = [{"role": "system", "content": "You are Lazy-Monster, a voice agent on the user's Windows PC. A reminder just "
+                 "went off. Suggest up to 3 concrete things you could do right now to help (open or update a project, "
+                 "write or fix code, draft an email, research something, make a document). Short imperative phrases "
+                 "of 3-8 words, as a JSON list of strings, nothing else." + ("\n\n" + ctx if ctx else "")},
+                {"role": "user", "content": f"Reminder: {about}"}]
+        try:
+            text = (self.client.chat(msgs)["choices"][0]["message"].get("content") or "").strip()
+            text = text[text.find("["): text.rfind("]") + 1]
+            items = [str(x).strip().rstrip(".") for x in json.loads(text) if str(x).strip()]
+            return items[:3]
+        except Exception:
+            return []
 
     def seed(self, assistant_text: str) -> None:
         """Start a conversation with something the monster said (e.g. the welcome-back recap)."""
@@ -395,6 +415,14 @@ class Agent:
                         if self.on_sleep:
                             self.on_sleep()
                         return True
+                    if intent.name in ("set_reminder", "list_reminders", "cancel_reminder"):
+                        from . import reminders
+                        out = (reminders.add(intent.args["what"], intent.args["when"])[1] if intent.name == "set_reminder"
+                               else reminders.describe() if intent.name == "list_reminders"
+                               else reminders.cancel(intent.args["what"]))
+                        self.log(event="step", n=step, of=self.max_steps, intent=intent.name, ok=True, msg=out, exec_ms=0)
+                        messages.append({"role": "tool", "tool_call_id": call.get("id", ""), "content": out})
+                        continue
                     if intent.name in ("close_all", "recent_work", "web_research"):
                         self._tools_used.append(intent.name)
                         if intent.name == "close_all":

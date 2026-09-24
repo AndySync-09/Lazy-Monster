@@ -92,6 +92,18 @@ SCHEMA: Dict[str, Dict[str, Any]] = {
                                "instead of answering from memory; search_web only opens a browser page"},
     "go_to_sleep":    {"slots": {}, "confirm": False, "early": False, "agent": True,
                        "desc": "The user wants you to stop listening / go to sleep / be quiet now"},
+    "set_reminder":   {"slots": {"what": (str, 1, 300), "when": (str, 1, 80)}, "confirm": False, "early": False,
+                       "agent": True, "desc": "Remind the user later. when: natural words like 'at 8 AM', 'in 20 minutes', "
+                                              "'tomorrow at 9'. At that time you wake up and suggest next steps"},
+    "list_reminders": {"slots": {}, "confirm": False, "early": False, "agent": True,
+                       "desc": "Say the user's upcoming reminders"},
+    "cancel_reminder": {"slots": {"what": (str, 1, 200)}, "confirm": False, "early": False, "agent": True,
+                        "desc": "Cancel a reminder by what it's about"},
+    "snooze":         {"slots": {"minutes": (int, 1, 240)}, "confirm": False, "early": False, "internal": True},
+    "draft_email":    {"slots": {"to": (str, 0, 200), "subject": (str, 0, 200), "body": (str, 0, 4000)},
+                       "optional": ["to"], "confirm": False, "early": False, "agent": True,
+                       "desc": "Open a new email draft in the user's mail app with the fields filled in. The user "
+                               "reviews and sends it; you never send email"},
     "close_all":      {"slots": {}, "confirm": False, "early": False, "agent": True,
                        "desc": "Close everything you opened this session (app windows, Notepad tabs you wrote in, Word documents, "
                                "VS Code windows, programs you ran). It asks the user about unsaved work itself and saves where they say"},

@@ -1428,6 +1428,7 @@ def _brain_rig(monkeypatch, tmp_path):
     eng, ex, *_ = make_agent([])
     cfg = Config()
     ctl = BrainControl(cfg, eng, lambda c: Agent(c, ex, lambda **k: None, lambda t: None))
+    ctl.validate = lambda client: None
     return eng, cfg, ctl
 
 
@@ -1470,7 +1471,7 @@ def test_settings_apply_live(monkeypatch, tmp_path):
     assert got["planner"] == "openai" and got["have"]["openai"] and got["voices"]
 
 
-def test_barge_in_needs_your_voice():
+def test_barge_in_by_loudness_with_tv_veto():
     import numpy as np
     import time as _t
     from lazymonster import conversation as C
@@ -1481,19 +1482,112 @@ def test_barge_in_needs_your_voice():
         def raw(self, s): return np.ones(16000, dtype=np.float32) * 0.1
     class Lock:
         threshold = 0.7
-        def __init__(self, ok): self.ok = ok
-        def check(self, a): return (self.ok, 0.9 if self.ok else 0.2)
+        def __init__(self, s): self.s = s
+        def check(self, a): return (self.s >= 0.7, self.s)
     c.tap = Tap()
-    for ok, expect in ((False, 0), (True, 1)):
-        c.lock = Lock(ok)
-        c.set(C.SPEAKING); c.spoke_at = eng.clock.t - 5; c._last_check = -1e9
+    for lock, expect in ((None, 1), (Lock(0.2), 0), (Lock(0.55), 1)):    # no lock / a TV / you, over the echo
+        c.lock = lock
+        c.set(C.SPEAKING); c.spoke_at = eng.clock.t - 5
         c.speaker.stopped = 0
         for _ in range(12):
             c.on_audio(np.ones(800, dtype=np.float32) * 0.1)
         _t.sleep(0.1)
-        assert c.speaker.stopped == expect
+        assert c.speaker.stopped == expect, (lock, c.speaker.stopped)
 
+
+def test_echo_alone_does_not_interrupt():
+    import numpy as np
+    from lazymonster import conversation as C
+    eng, *_ = make()
+    c, events = _conv(eng)
+    class K:
+        playing = (np.ones(24000 * 10, dtype=np.float32) * 0.2, 24000, __import__("time").monotonic() - 1)
+    c.speaker.kokoro = K()
+    c.set(C.SPEAKING); c.spoke_at = eng.clock.t - 5
+    c.speaker.stopped = 0
+    for _ in range(40):                       # the mic hears the monster at a steady ratio (its echo)
+        c.on_audio(np.ones(800, dtype=np.float32) * 0.06)
+    assert c.speaker.stopped == 0
 
 def test_version_compare():
     from lazymonster.cli import _newer
     assert _newer("1.2.1", "1.2.0") and not _newer("1.2.0", "1.2.0") and _newer("1.10.0", "1.9.9")
+
+
+def test_bad_model_is_rejected_and_the_working_one_kept(monkeypatch, tmp_path):
+    from lazymonster.agent import AgentError
+    eng, cfg, ctl = _brain_rig(monkeypatch, tmp_path)
+    ctl.reload()
+    def picky(client):
+        if client.model == "gpt-5.4-pro":
+            raise AgentError("HTTP 404: this model is only in the Responses API")
+    ctl.validate = picky
+    msg = ctl.set_model("gpt-5.4-pro")
+    assert "didn't work" in msg and cfg.openai_model == "gpt-5.4-mini" and eng.worker.agent.client.model == "gpt-5.4-mini"
+    assert ctl.set_model("gpt-5.4") == "Now using gpt-5.4." and eng.worker.agent.client.model == "gpt-5.4"
+
+
+# ---- 1.3.0: reminders that come to you, voice lock accuracy -----------------------------------------
+@pytest.mark.parametrize("text,expect", [
+    ("at 8 AM", "2026-09-25 08:00"), ("at 8", "2026-09-25 08:00"), ("at 8:30 pm", "2026-09-25 20:30"),
+    ("in 10 minutes", "2026-09-24 22:25"), ("in half an hour", "2026-09-24 22:45"), ("tomorrow morning", "2026-09-25 08:00"),
+    ("tonight at 11", "2026-09-24 23:00"), ("at noon", "2026-09-25 12:00")])
+def test_reminder_times(text, expect):
+    from datetime import datetime
+    from lazymonster.reminders import parse_when
+    assert parse_when(text, datetime(2026, 9, 24, 22, 15)).strftime("%Y-%m-%d %H:%M") == expect
+
+
+def test_reminder_by_voice_list_cancel(tmp_path, monkeypatch):
+    monkeypatch.setenv("APPDATA", str(tmp_path))
+    eng, ex, *_ = make()
+    spoken = []
+    eng.say = spoken.append
+    eng.on_complete(1, "hey monster remind me about the cafe website meeting at 8 AM")
+    assert "cafe website meeting" in spoken[-1] and "8 AM" in spoken[-1] and ex.calls == []
+    eng.on_complete(2, "hey monster what are my reminders")
+    assert "cafe website meeting" in spoken[-1]
+    eng.on_complete(3, "hey monster cancel the cafe reminder")
+    assert spoken[-1].startswith("Cancelled")
+
+
+def test_due_reminder_fires_once_and_late_ones_within_3h(tmp_path, monkeypatch):
+    from datetime import datetime
+    monkeypatch.setenv("APPDATA", str(tmp_path))
+    from lazymonster import reminders
+    reminders.add("the cafe website meeting", "at 8 AM", now=datetime(2026, 9, 24, 7, 0))
+    reminders.add("old thing", "at 1 AM", now=datetime(2026, 9, 24, 0, 30))
+    fired = []
+    s = reminders.Scheduler(lambda r, late: fired.append((r["what"], late)), clock=lambda: datetime(2026, 9, 24, 8, 0, 30))
+    s.tick(); s.tick()
+    assert fired == [("the cafe website meeting", False)]           # 1 AM is 7 h late: dropped, not nagged
+
+
+def test_reminder_suggests_and_waits_for_your_pick(tmp_path, monkeypatch):
+    monkeypatch.setenv("APPDATA", str(tmp_path))
+    eng, ex, client, said, fb = make_agent([[("draft_email", {"subject": "Cafe website meeting", "body": "Agenda..."})],
+                                            [("finish", {"summary": "The draft is open for you to review."})]])
+    agent = eng.worker.agent
+    agent.suggest = lambda about: ["open the cafe website project", "update the menu page", "draft an agenda email"]
+    c, events = _conv(eng, user_name="Andy")
+    eng.feedback = c.feedback
+    c.nudge_after = 3600
+    c.remind({"id": "r1", "what": "the cafe website meeting", "when": "2026-09-24T08:00"})
+    line = c.speaker.said[-1]
+    assert line.startswith("Andy, it's 8 AM. Reminder: the cafe website meeting.") and "draft an agenda email" in line
+    assert ex.calls == []                                           # nothing done before you pick
+    eng.on_complete(7, "the last one")                              # no wake word: it's waiting for you
+    assert [x.name for x in ex.calls] == ["draft_email"]
+    hist = [m["content"] for m in client.seen if m.get("role") == "assistant" and m.get("content")]
+    assert any("Options I offered" in h for h in hist)
+
+
+def test_voice_lock_is_fair_to_short_commands():
+    import numpy as np
+    from lazymonster.voicelock import VoiceLock
+    v = VoiceLock.__new__(VoiceLock)
+    v.threshold = 0.68
+    assert abs(v.threshold_for(0.6) - 0.53) < 1e-9 and v.threshold_for(2.5) == 0.68
+    x = np.concatenate([np.zeros(16000), np.sin(np.arange(16000) / 5) * 0.2, np.zeros(16000)]).astype(np.float32)
+    sp = VoiceLock.speech(x)
+    assert 16000 <= len(sp) <= 16000 + 320 * 12

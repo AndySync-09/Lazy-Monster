@@ -173,6 +173,12 @@ class PosixExecutor:
         self.code = self.code or CodeWorkspace()
         return self.code.install(project, packages)
 
+    def _draft_email(self, subject="", body="", to=""):
+        from urllib.parse import quote
+        url = f"mailto:{quote(to or '', safe='@,')}?subject={quote(subject or '')}&body={quote((body or '')[:1800])}"
+        subprocess.Popen(["open", url] if MAC else ["xdg-open", url])
+        return True, f"opened an email draft titled {subject!r}; the user reviews and sends it"
+
     def owned_items(self):
         return []
 

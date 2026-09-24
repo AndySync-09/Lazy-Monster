@@ -5,6 +5,8 @@ can no longer drift out of sync.
   SLEEPING -> LISTENING (your turn) -> THINKING -> ACTING -> SPEAKING -> AWAITING (your reply) -> SLEEPING
 """
 import random
+
+import numpy as np
 import threading
 import time
 from typing import Callable
@@ -37,8 +39,11 @@ class Conversation:
         self.woke_at = 0.0
         self.confirm_wake = None                # cli: second opinion (Whisper hears "monster", voice lock hears you)
         self.lock = None                        # voice lock: lets you interrupt just by talking
+        self.on_remind = None                   # cli: show the window, tray notification
+        self.nudge_after = 300.0
         self.barge_in = True
         self._loud, self._checking, self._last_check = 0.0, False, -1e9
+        self._ratios = []
         self.greet_every = 1800.0               # say "Hi Andy" at most every 30 minutes; otherwise just the chime
         self._greeted_at = -1e9
         self.listeners = []                     # callables(state) — e.g. show the window on wake
@@ -198,34 +203,103 @@ class Conversation:
         if phrase:
             threading.Thread(target=self.speaker.say, args=(phrase,), daemon=True).start()
 
+    # ---- reminders that come to you -----------------------------------------------------------
+    def remind(self, r: dict, late: bool = False) -> None:
+        """A reminder is due: wake up, say it, suggest what to do next, and wait for your pick.
+        Nothing is done until you choose."""
+        from datetime import datetime
+        when = datetime.fromisoformat(r["when"]).strftime("%I:%M %p").lstrip("0").replace(":00 ", " ")
+        if self.on_remind:
+            try:
+                self.on_remind(r)
+            except Exception:
+                pass
+        sounds.play("wake", self.chimes)
+        who = f"{self.user_name}, " if self.user_name else ""
+        head = f"{who}you had a reminder at {when}: {r['what']}." if late else f"{who}it's {when}. Reminder: {r['what']}."
+        agent = self.engine.worker.agent
+        ideas = agent.suggest(r["what"]) if agent is not None else []
+        if ideas:
+            opts = ", ".join(ideas[:-1]) + (", or " if len(ideas) > 1 else "") + ideas[-1]
+            line = f"{head} I could {opts[0].lower() + opts[1:]}. Want me to do one of those?"
+            agent.seed(f"{line}\n(Options I offered: " + "; ".join(f"{i + 1}) {x}" for i, x in enumerate(ideas))
+                       + ". Do nothing until the user picks one.)")
+            agent.last_said = line
+        else:
+            line = head
+        self.engine.log(event="reminder_fired", what=r["what"], late=late, ideas=ideas)
+        self.emit({"type": "say", "text": line})
+        self.speaker.say(line)
+        fired_at = self.clock()
+        self.engine.armed_until = self.clock() + 45
+        self.engine.armed_source = "followup"
+        self.set(AWAITING, "reminder: your pick")
+
+        def nudge():                               # brushing your teeth? one gentle repeat
+            from . import reminders
+            if self.engine.last_activity < fired_at and not r.get("nudged"):
+                reminders.mark(r["id"], nudged=True)
+                again = f"Just checking: {r['what']}." + (" Want me to start on something?" if ideas else "")
+                if agent is not None and ideas:
+                    agent.seed(f"{again}\n(Options I offered earlier: " + "; ".join(ideas) + ".)")
+                self.emit({"type": "say", "text": again})
+                self.speaker.say(again)
+                self.engine.armed_until = self.clock() + 45
+                self.engine.armed_source = "followup"
+        t = threading.Timer(self.nudge_after, nudge)
+        t.daemon = True
+        t.start()
+
     # ---- interrupting by just talking -----------------------------------------------------
+    def playback_level(self, now: float) -> float:
+        """How loud the monster's own voice is right now (what the mic hears as echo)."""
+        k = getattr(self.speaker, "kokoro", None)
+        pl = getattr(k, "playing", None) if k is not None else None
+        if not pl:
+            return 0.0
+        audio, sr, start = pl
+        t = now - start
+        i0, i1 = int(max(0.0, t - 0.25) * sr), int(max(0.0, t + 0.05) * sr)
+        seg = audio[i0:i1]
+        return float(np.sqrt(np.mean(seg ** 2))) if len(seg) else 0.0
+
     def on_audio(self, block) -> None:
-        """Mic blocks while the monster talks. Sustained speech that passes the voice lock
-        stops it: its own voice (or the TV) can't, because they aren't you."""
-        if self.state != SPEAKING or self.lock is None or not self.barge_in or self._checking:
-            self._loud = 0.0
+        """Mic blocks while the monster talks. Interrupting works by loudness against its
+        own echo: while it speaks, the mic hears its voice at a steady ratio; when you talk
+        over it, the mic gets much louder than that ratio explains. The voice lock, when
+        on, only vetoes voices that are clearly someone else (a TV)."""
+        if self.state != SPEAKING or not self.barge_in:
+            self._loud, self._ratios = 0.0, getattr(self, "_ratios", [])[-40:]
             return
-        import numpy as np
-        rms = float(np.sqrt(np.mean(np.asarray(block, dtype=np.float32) ** 2)))
-        self._loud = self._loud + len(block) / 16000 if rms > 0.02 else max(0.0, self._loud - 0.05)
-        now = self.clock()
-        if self._loud < 0.5 or now - self._last_check < 0.7 or now - self.spoke_at < 0.6:
+        now = time.monotonic()
+        mic = float(np.sqrt(np.mean(np.asarray(block, dtype=np.float32) ** 2)))
+        play = self.playback_level(now)
+        ratios = getattr(self, "_ratios", [])
+        if play > 0.02 and self._loud == 0.0:
+            ratios.append(mic / play)
+            self._ratios = ratios[-40:]
+        echo = float(np.median(self._ratios)) if len(self._ratios) >= 8 else 1.0
+        over = mic > max(0.018, 2.5 * echo * play + 0.01)
+        self._loud = self._loud + len(block) / 16000 if over else max(0.0, self._loud - len(block) / 32000)
+        if self._loud < 0.35 or self._checking or self.clock() - self.spoke_at < 0.5:
             return
-        self._checking, self._last_check = True, now
+        self._checking = True
         tap = getattr(self, "tap", None)
 
-        def check():
+        def go():
             try:
-                audio = tap.raw(1.0) if tap is not None else None
-                ok, score = self.lock.check(audio) if audio is not None and len(audio) else (False, -1)
-                if ok or (score >= 0 and score >= self.lock.threshold - 0.08):
-                    self.engine.barge_t = self.clock() - 1.0
-                    self.speaker.interrupt()
-                    self.engine.log(event="barge_in", score=round(float(score), 3))
-                    self.engine.wake_up("barge-in")
+                if self.lock is not None and tap is not None:
+                    ok, score = self.lock.check(tap.raw(1.0))
+                    if not ok and 0 <= score < 0.35:            # clearly not you: a TV, someone else
+                        self.engine.log(event="barge_vetoed", score=round(float(score), 3))
+                        return
+                self.engine.barge_t = self.clock() - 1.0
+                self.speaker.interrupt()
+                self.engine.log(event="barge_in")
+                self.engine.wake_up("barge-in")
             finally:
                 self._checking, self._loud = False, 0.0
-        threading.Thread(target=check, daemon=True).start()
+        threading.Thread(target=go, daemon=True).start()
 
     # ---- wake word -------------------------------------------------------------------
     def on_wake(self, score: float) -> None:

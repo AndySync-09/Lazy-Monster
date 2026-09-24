@@ -10,6 +10,7 @@ class DryRunExecutor:
         "code_run": "main.py is running (pid 1234); its window should be open",
         "code_install": "installed pygame into snake_game/.venv",
         "open_file": "opened C:\\temp\\index.html in chrome",
+        "draft_email": "opened an email draft titled 'Cafe website meeting'; the user reviews and sends it",
         "export_pdf": "saved and opened C:\\temp\\doc.pdf",
         "make_presentation": "built and opened C:\\temp\\deck.pptx",
     }

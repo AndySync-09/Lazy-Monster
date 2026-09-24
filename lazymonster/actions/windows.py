@@ -590,3 +590,10 @@ class WindowsExecutor:
         h, title, proc = uia.foreground()
         self._own(h, "PowerPoint", proc)
         return True, f"built and opened {p}"
+
+    def _draft_email(self, subject="", body="", to=""):
+        """A draft in your mail app, filled in. You press Send; the monster never does."""
+        from urllib.parse import quote
+        url = f"mailto:{quote(to or '', safe='@,')}?subject={quote(subject or '')}&body={quote((body or '')[:1800])}"
+        os.startfile(url)
+        return True, f"opened an email draft{' to ' + to if to else ''} titled {subject!r}; the user reviews and sends it"

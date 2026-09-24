@@ -57,6 +57,7 @@ class Engine:
         self.jev = None                                         # optional decider: "was that meant for me?"
         self.armed_source = "wake"                              # wake | followup
         self.trusted_until = 0.0                                # push-to-talk: skip the voice lock until then
+        self.learn_voice = None                                 # learn from requests that were certainly you
         self.last_activity = 0.0
         # Turn-taking: the speech model splits a sentence at every pause; a turn collects
         # those lines until you have finished (turn_delay seconds of quiet), then acts once.
@@ -262,6 +263,8 @@ class Engine:
         if not self._is_you(t["first"], t["typed"]):
             self.feedback("unknown")
             return
+        if self.learn_voice is not None and not t["typed"] and self.clock() < self.trusted_until:
+            threading.Thread(target=self.learn_voice, args=(t["first"],), daemon=True).start()
         # No wake word, just the follow-up window: was that actually meant for the monster?
         if (self.jev is not None and not t["typed"] and not t["woke"] and t.get("source") == "followup"
                 and not (self.pending and self.clock() < self.pending_until)):
@@ -338,6 +341,16 @@ class Engine:
         if intent.name == "exit_app":
             self.worker.cancel()
             self.go_to_sleep(cmd)
+            return
+        if intent.name in ("set_reminder", "list_reminders", "cancel_reminder", "snooze"):
+            from . import reminders
+            a = intent.args
+            msg = (reminders.add(a["what"], a["when"])[1] if intent.name == "set_reminder" else
+                   reminders.describe() if intent.name == "list_reminders" else
+                   reminders.cancel(a.get("what", "")) if intent.name == "cancel_reminder" else
+                   reminders.snooze(a.get("minutes", 10)))
+            self.log(event="reminder", intent=intent.name, **{k: str(v) for k, v in a.items()})
+            self.say(msg)
             return
         if intent.name in ("brain_switch", "brain_big", "brain_info"):
             self.log(event="brain_cmd", intent=intent.name, **intent.args)

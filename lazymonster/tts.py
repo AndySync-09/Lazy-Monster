@@ -34,6 +34,7 @@ class KokoroVoice:
         self.model_path, self.voices_path = model_path, voices_path          # your own Kokoro-format files
         self.k = None
         self.cancel = threading.Event()
+        self.playing = None                 # (audio, sample rate, start time): lets barge-in tell its echo from you
 
     def ensure(self):
         from pathlib import Path
@@ -77,12 +78,14 @@ class KokoroVoice:
             item = q.get()
             if item is None or self.cancel.is_set():
                 break
+            self.playing = (np.asarray(item[0], dtype=np.float32), item[1], time.monotonic())
             sd.play(item[0], samplerate=item[1])
             while sd.get_stream().active:               # poll so an interrupt stops mid-sentence
                 if self.cancel.is_set():
                     sd.stop()
                     break
                 time.sleep(0.03)
+        self.playing = None
 
 
 class Speaker:

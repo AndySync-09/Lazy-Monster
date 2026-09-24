@@ -24,8 +24,9 @@ def list_models(cfg, provider: str) -> List[str]:
             r = requests.get(f"{cfg.openai_base_url}/models", timeout=10,
                              headers={"Authorization": f"Bearer {get_key(cfg.openai_api_key_env)}"})
             ids = [m["id"] for m in r.json().get("data", [])]
-            ids = [i for i in ids if i.startswith(("gpt-", "o1", "o3", "o4", "o5")) and not any(
-                x in i for x in ("audio", "realtime", "tts", "transcribe", "image", "search", "embedding"))]
+            ids = [i for i in ids if i.startswith(("gpt-4o", "gpt-4.1", "gpt-5", "gpt-6", "o3", "o4")) and not any(
+                x in i for x in ("audio", "realtime", "tts", "transcribe", "image", "search", "embedding",
+                                 "instruct", "codex", "moderation", "preview-2024", "chat-latest"))]
             return sorted(ids, reverse=True)
         if p == "anthropic":
             r = requests.get(f"{cfg.anthropic_base_url}/models", timeout=10,
@@ -54,9 +55,22 @@ def set_key(env_name: str, value: str) -> None:
                        capture_output=True)
 
 
+PING = [{"type": "function", "function": {"name": "ping", "description": "Reply to a ping",
+                                          "parameters": {"type": "object", "properties": {}}}}]
+
+
+def can_drive_apps(client) -> None:
+    """The monster only works with a model that answers and calls tools. Raises with the reason."""
+    data = client.chat([{"role": "user", "content": "Call the ping tool now."}], PING)
+    msg = data["choices"][0]["message"]
+    if not msg.get("tool_calls"):
+        raise AgentError("it answered but didn't use tools, so it can't drive your apps")
+
+
 class BrainControl:
     def __init__(self, cfg, engine, make_agent: Callable[[object], Agent], on_change: Callable[[], None] = lambda: None):
         self.cfg, self.engine, self.make_agent, self.on_change = cfg, engine, make_agent, on_change
+        self.validate = can_drive_apps           # checked before a new brain or model is kept
 
     # ---- state -------------------------------------------------------------------
     def describe(self) -> str:
@@ -79,15 +93,16 @@ class BrainControl:
         return bool(get_key(KEY_ENV[p]))
 
     # ---- changes -------------------------------------------------------------------
-    def reload(self) -> Optional[str]:
-        """Rebuild the brain from the current settings, live."""
+    def reload(self, check: bool = False) -> Optional[str]:
+        """Rebuild the brain from the current settings, live. check=True tries it first."""
         w = self.engine.worker
         try:
             client = build_client(self.cfg)
-        except AgentError as e:
-            client, err = None, str(e)
-        else:
-            err = None
+            if check and client is not None:
+                self.validate(client)
+        except Exception as e:
+            return str(e)[:200]
+        err = None
         if client is None:
             w.agent, self.engine.agent_enabled = None, False
         else:
@@ -109,10 +124,14 @@ class BrainControl:
         if not self.available(p):
             what = "a local model address" if p == "local" else f"a {PROVIDERS[p]} key"
             return f"I need {what} first. Open settings and add it, then ask me again."
+        before = self.cfg.planner
         self.cfg.planner = p
+        err = self.reload(check=True)
+        if err:
+            self.cfg.planner = before                    # keep the brain that works
+            return f"{PROVIDERS[p]} didn't work ({err}). I kept {PROVIDERS.get(before, before)}."
         save_setting("planner", p)
-        err = self.reload()
-        return f"That didn't work: {err}" if err else "Done. " + self.describe()
+        return "Done. " + self.describe()
 
     def go_big(self, on: bool) -> str:
         self.cfg.go_big = on
@@ -128,13 +147,15 @@ class BrainControl:
         field = MODEL_FIELD.get(p)
         if not field:
             return "Pick a provider first."
+        before = getattr(self.cfg, field)
         setattr(self.cfg, field, model)
-        save_setting(field, model)
         if p == self.cfg.planner:
-            err = self.reload()
+            err = self.reload(check=True)
             if err:
-                return f"Saved, but it didn't start: {err}"
-        return f"{PROVIDERS.get(p, p)} model set to {model}."
+                setattr(self.cfg, field, before)          # keep the model that works
+                return f"{model} didn't work ({err}). I kept {before}."
+        save_setting(field, model)
+        return f"Now using {model}." if p == self.cfg.planner else f"{PROVIDERS.get(p, p)} model set to {model}."
 
     def test(self) -> str:
         a = self.engine.worker.agent
