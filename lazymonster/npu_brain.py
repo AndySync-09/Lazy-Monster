@@ -11,36 +11,34 @@ from pathlib import Path
 from typing import Optional, Tuple
 
 QUICK_TOOLS = {
-    "open_app": ("app", "Open an app, e.g. Notepad, Spotify, Chrome"),
-    "close_app": ("app", "Close an app"),
-    "search_web": ("query", "Search the web in the browser"),
-    "open_url": ("url", "Open a website address"),
-    "volume_set": ("level", "Set the volume, 0-100"),
-    "mute": ("", "Mute the sound"),
-    "unmute": ("", "Unmute the sound"),
-    "media_play_pause": ("", "Play or pause music"),
-    "media_next": ("", "Next song"),
-    "new_tab": ("", "New browser tab"),
-    "write_in_app": ("app, text", "Open an app and write short text you compose (a haiku, a note, a short list)"),
-    "set_reminder": ("what, when", "Remind the user; when is words like 'at 5 pm' or 'in 20 minutes'"),
-    "list_reminders": ("", "Say the user's reminders"),
-    "system_status": ("", "How the PC is doing: CPU, memory, what is using them"),
+    "open_app": "app", "close_app": "app", "search_web": "query", "open_url": "url", "volume_set": "level",
+    "mute": "", "unmute": "", "media_play_pause": "", "media_next": "", "new_tab": "",
+    "write_in_app": "app, text", "set_reminder": "what, when", "list_reminders": "", "system_status": "",
 }
 
-SYSTEM = ("You are the quick brain of Lazy-Monster, a voice assistant on a Windows PC. Reply with ONE line of JSON and "
-          "nothing else.\n"
-          "If the request is ONE simple action from the list, reply "
-          '{"tool": "<name>", "args": {...}, "say": "<a short spoken confirmation>"}.\n'
-          'If it needs several steps, research, coding, documents, files, email, the screen, or you are unsure, reply '
-          '{"tool": "hand_off"}.\n\nTools (name: args - what it does):\n'
-          + "\n".join(f"{n}: {a or 'no args'} - {d}" for n, (a, d) in QUICK_TOOLS.items())
-          + "\n\nExamples:\n"
-          'open spotify -> {"tool": "open_app", "args": {"app": "Spotify"}, "say": "Opening Spotify."}\n'
-          'set the volume to 30 -> {"tool": "volume_set", "args": {"level": 30}, "say": "Volume at 30."}\n'
-          'remind me at 5 to call priya -> {"tool": "set_reminder", "args": {"what": "call Priya", "when": "at 5 pm"}, "say": "Okay."}\n'
-          'write a haiku about rain in notepad -> {"tool": "write_in_app", "args": {"app": "Notepad", "text": "Soft rain on the roof\\nthe city exhales slowly\\npuddles hold the sky"}, "say": "Done, it\'s in Notepad."}\n'
-          'build me a snake game in python -> {"tool": "hand_off"}\n'
-          'research the latest Qwen news and make slides -> {"tool": "hand_off"}')
+# Short on purpose: on the NPU most of the time goes into reading the prompt, so every word costs.
+SYSTEM = ('Voice assistant router. Reply with one line of JSON: {"tool": name, "args": {...}}. '
+          'Use {"tool": "hand_off"} for anything with several steps, research, code, documents, files, email, '
+          "the screen, or if unsure.\nTools: " + "; ".join(f"{n}({a})" for n, a in QUICK_TOOLS.items()) + "\n"
+          'play music -> {"tool": "media_play_pause", "args": {}}\n'
+          'open spotify -> {"tool": "open_app", "args": {"app": "Spotify"}}\n'
+          'remind me at 5 to call priya -> {"tool": "set_reminder", "args": {"what": "call Priya", "when": "at 5 pm"}}\n'
+          'write a haiku about rain in notepad -> {"tool": "write_in_app", "args": {"app": "Notepad", "text": "Soft rain on the roof\\nthe city exhales slowly\\npuddles hold the sky"}}\n'
+          'build a snake game -> {"tool": "hand_off"}')
+
+SAY = {"open_app": "Opening {app}.", "close_app": "Closing {app}.", "search_web": "Searching for {query}.",
+       "open_url": "Opening it.", "volume_set": "Volume at {level}.", "mute": "Muted.", "unmute": "Sound's back.",
+       "media_play_pause": "Okay.", "media_next": "Next one.", "new_tab": "New tab.", "write_in_app": "Done, it's in {app}."}
+
+_BIG = __import__("re").compile(r"\b(and then|then|research|build|create|code|script|program|slides?|presentation|deck|"
+                                r"document|report|email|mail|file|folder|screen|summari[sz]e|explain|compare|website|"
+                                r"project|install|run it|fix|debug)\b", __import__("re").I)
+
+
+def looks_simple(task: str) -> bool:
+    """Only short, one-thing requests go to the quick brain, so bigger ones don't wait for it."""
+    return len(task.split()) <= 14 and not _BIG.search(task)
+
 
 CANDIDATES = ["llmware/qwen2.5-1.5b-instruct-ov", "OpenVINO/Qwen2.5-1.5B-Instruct-int4-ov",
               "llmware/Qwen2.5-VL-3B-Instruct-ov-int4-npu"]
@@ -86,7 +84,7 @@ class QuickBrain:
         self.load_s = time.perf_counter() - t0
         self.device = device
         self.gen = ovg.GenerationConfig()
-        self.gen.max_new_tokens = 120
+        self.gen.max_new_tokens = 72
         self.gen.do_sample = False
 
     def ask(self, request: str) -> Tuple[dict, float]:
@@ -110,7 +108,11 @@ class QuickBrain:
             intent = validate(name, d.get("args") or {}, source="agent", allow_refs=False)
         except Exception:
             return None
-        return intent, str(d.get("say") or "Done.")[:160], secs
+        try:
+            say = SAY.get(name, "Done.").format(**intent.args)
+        except (KeyError, IndexError):
+            say = "Done."
+        return intent, say, secs
 
 
 def model_path(repo: str) -> Path:

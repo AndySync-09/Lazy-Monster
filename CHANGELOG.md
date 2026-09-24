@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.6.1
+- **Quick brain, faster.** On the NPU most of the 3.5 s went into reading a long prompt, so the prompt is now about a third of the size, and the model no longer writes the spoken confirmation (the monster fills it in: "Opening Spotify."), so it writes a third as much.
+- **No wait for big requests.** Requests that are obviously bigger (research, code, slides, email, files, the screen, "and then…", or more than 14 words) skip the quick brain and go straight to the main brain.
+- "Play some music" now plays music instead of opening an app.
+- `monster bench-brain --device all` runs the chosen model on the NPU and the GPU and keeps the faster one that's as accurate.
+
 ## 1.6.0: a brain on the NPU
 - **Quick brain (preview).** A small language model on the Intel NPU handles simple one-step requests ("open Spotify", "volume 40", "remind me in 20 minutes to stretch", "write a haiku in Notepad", "why is my laptop slow") without the cloud: it answers with one line of JSON naming the tool, the monster checks it against the same rules as always, and does it. Anything with several steps, research, code, documents, email or the screen, or anything it isn't sure about, goes to the main brain as before, and so does anything whose action fails. The status bar shows "+ NPU" when it's on.
 - **`monster bench-brain`** downloads the candidates (Qwen2.5 1.5B builds for OpenVINO, and the Qwen2.5-VL 3B NPU build already used by bench-vision), times 12 everyday requests on the NPU, counts how often each picks the right tool, and keeps the best one that's right at least 75% of the time. Then `monster brain --quick on`, or Settings > Brain > Quick brain on the NPU.

@@ -937,19 +937,22 @@ def cmd_bench_brain(a, cfg):
     tui.enable()
     if a.mirror:
         os.environ["HF_ENDPOINT"] = "https://hf-mirror.com"
-    tui.title(f"Quick brain on the {a.device}: {len(nb.TESTS)} everyday requests each")
+    devices = ["NPU", "GPU"] if a.device == "all" else [a.device]
+    tui.title(f"Quick brain on {' and '.join(devices)}: {len(nb.TESTS)} everyday requests each")
     best = None
-    for repo in ([a.model] if a.model else nb.CANDIDATES):
-        tui.say(repo)
+    repos = [a.model] if a.model else (["OpenVINO/Qwen2.5-1.5B-Instruct-int4-ov"] if a.device == "all" else nb.CANDIDATES)
+    runs = [(r, d) for r in repos for d in devices]
+    for repo, device in runs:
+        tui.say(f"{repo} on {device}")
         if not nb.model_path(repo).exists() or a.redownload:
             tui.dim("  downloading (resumes if interrupted)…")
             if not nb.download(repo, say=tui.dim):
                 tui.warn("  couldn't download it; try --mirror")
                 continue
         try:
-            qb = nb.QuickBrain(nb.model_path(repo), a.device, models_dir() / "ov_cache")
+            qb = nb.QuickBrain(nb.model_path(repo), device, models_dir() / "ov_cache")
         except Exception as e:
-            tui.warn(f"  the {a.device} refused it: {type(e).__name__}: {str(e).splitlines()[0][:120]}")
+            tui.warn(f"  the {device} refused it: {type(e).__name__}: {str(e).splitlines()[0][:120]}")
             continue
         right, times = 0, []
         qb.ask("open notepad")                                   # warm-up
@@ -966,13 +969,13 @@ def cmd_bench_brain(a, cfg):
         acc = right / len(nb.TESTS)
         med = sorted(times)[len(times) // 2]
         tui.ok(f"  {right}/{len(nb.TESTS)} right, typical {med:.1f} s per request, loaded in {qb.load_s:.1f} s")
-        if acc >= 0.75 and (best is None or (acc, -med) > (best[1], -best[2])):
-            best = (repo, acc, med)
+        if acc >= 0.75 and (best is None or (round(acc, 2), -med) > (round(best[1], 2), -best[2])):
+            best = (repo, acc, med, device)
         del qb
     if best:
         save_setting("quick_brain_model", best[0])
-        save_setting("quick_brain_device", a.device)
-        tui.ok(f"Chosen: {best[0]} ({best[1]:.0%} right, {best[2]:.1f} s). Turn it on: monster brain --quick on "
+        save_setting("quick_brain_device", best[3])
+        tui.ok(f"Chosen: {best[0]} on the {best[3]} ({best[1]:.0%} right, {best[2]:.1f} s). Turn it on: monster brain --quick on "
                "(or Settings > Brain > Quick brain on the NPU), then restart the monster.")
     else:
         tui.warn("None was right often enough (75%) to handle requests on its own. The main brain keeps doing everything.")
@@ -1457,7 +1460,7 @@ def main(argv=None):
     vl.add_argument("state", choices=["on", "off"])
     sub.add_parser("update", help="update to the newest version (keeps your settings and models)")
     bb = sub.add_parser("bench-brain", help="try small models on the NPU as the quick brain")
-    bb.add_argument("--device", default="NPU", choices=["NPU", "GPU", "CPU"])
+    bb.add_argument("--device", default="NPU", choices=["NPU", "GPU", "CPU", "all"])
     bb.add_argument("--model", default="")
     bb.add_argument("--mirror", action="store_true")
     bb.add_argument("--redownload", action="store_true")

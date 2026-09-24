@@ -1779,9 +1779,18 @@ def test_quick_brain_does_simple_things_and_hands_off_the_rest():
         def handle(self, task):
             if "spotify" in task:
                 return validate("open_app", {"app": "Spotify"}, source="agent"), "Opening Spotify.", 0.4
+            raise AssertionError("big requests must not reach the quick brain")
             return None
     agent.quick = Q()
     agent.run("open spotify please")
     assert [c.name for c in ex.calls] == ["open_app"] and said[-1] == "Opening Spotify." and client.seen == []
     agent.run("build a snake game")
     assert client.seen and said[-1].startswith("Built the game.")          # handed to the main brain
+
+
+def test_quick_brain_only_sees_simple_requests():
+    from lazymonster.npu_brain import SYSTEM, looks_simple
+    assert looks_simple("open spotify") and looks_simple("remind me in 20 minutes to stretch")
+    assert not looks_simple("research the latest nvidia news and make three slides")
+    assert not looks_simple("build a snake game in python") and not looks_simple("email Priya the menu")
+    assert len(SYSTEM.split()) < 140

@@ -378,6 +378,9 @@ class Agent:
 
     def _quick_path(self, task: str) -> bool:
         """Simple one-step requests: the NPU model picks the tool; anything else goes to the main brain."""
+        from .npu_brain import looks_simple
+        if not looks_simple(task):
+            return False                                        # obviously big: straight to the main brain
         try:
             r = self.quick.handle(task)
         except Exception as e:
