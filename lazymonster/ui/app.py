@@ -143,6 +143,28 @@ class Api:
     def __init__(self, engine, stop: threading.Event, bus: UIBus, speaker=None, conv=None):
         self._engine, self._stop, self._bus, self._speaker, self._conv = engine, stop, bus, speaker, conv
 
+    # ---- settings panel (everything saves and applies live) ----
+    def get_settings(self):
+        return self._ctl.get() if getattr(self, "_ctl", None) else {}
+
+    def list_models(self, provider):
+        return self._ctl.models(provider) if getattr(self, "_ctl", None) else []
+
+    def set_setting(self, key, value):
+        return self._ctl.set(key, value) if getattr(self, "_ctl", None) else "Not ready yet."
+
+    def set_key(self, provider, value):
+        return self._ctl.key(provider, value) if getattr(self, "_ctl", None) else "Not ready yet."
+
+    def test_brain(self):
+        return self._ctl.test() if getattr(self, "_ctl", None) else "Not ready yet."
+
+    def preview_voice(self, voice):
+        return self._ctl.preview(voice) if getattr(self, "_ctl", None) else ""
+
+    def retrain_voice(self):
+        return self._ctl.retrain() if getattr(self, "_ctl", None) else ""
+
     def talk(self):
         if self._conv is not None:
             threading.Thread(target=self._conv.push_to_talk, daemon=True).start()
@@ -193,6 +215,30 @@ def corner_geom(sw: int, sh: int, side: str = "left", saved=None) -> dict:
     return {"full": (int(x), int(y), W, H), "orb": (int(ox), int(max(0, sh - OH - taskbar)), OW, OH), "screen": (sw, sh)}
 
 
+def tool_window(win) -> None:
+    """Windows: no taskbar button and no Alt+Tab entry; the tray icon is its home."""
+    import os
+    if os.name != "nt":
+        return
+    try:
+        import win32con
+        import win32gui
+        hwnd = None
+        try:
+            hwnd = int(win.native.Handle.ToInt64())
+        except Exception:
+            hwnd = win32gui.FindWindow(None, "Lazy-Monster")
+        if not hwnd:
+            return
+        ex = win32gui.GetWindowLong(hwnd, win32con.GWL_EXSTYLE)
+        ex = (ex | win32con.WS_EX_TOOLWINDOW) & ~win32con.WS_EX_APPWINDOW
+        win32gui.ShowWindow(hwnd, win32con.SW_HIDE)
+        win32gui.SetWindowLong(hwnd, win32con.GWL_EXSTYLE, ex)
+        win32gui.ShowWindow(hwnd, win32con.SW_SHOWNOACTIVATE)
+    except Exception:
+        pass
+
+
 def run_window(bus: UIBus, api: Api, backend, stop: threading.Event, hidden: bool = False, saved_pos=None):
     """Blocks on the main thread (pywebview requirement); backend runs alongside."""
     import webview
@@ -209,6 +255,10 @@ def run_window(bus: UIBus, api: Api, backend, stop: threading.Event, hidden: boo
     bus.attach(win)
     try:
         win.events.moved += bus.on_moved           # remember where you put it
+    except Exception:
+        pass
+    try:
+        win.events.shown += lambda: tool_window(win)
     except Exception:
         pass
 

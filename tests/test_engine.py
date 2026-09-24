@@ -530,7 +530,7 @@ def test_typed_text_skips_audio_refine():
 def test_ui_api_exposes_only_three_methods():
     from lazymonster.ui.app import Api
     api = Api(engine=object(), stop=None, bus=None)
-    assert [n for n in dir(api) if not n.startswith("_")] == ["compact", "hide", "sleep", "stop_talking", "submit", "talk"]
+    assert [n for n in dir(api) if not n.startswith("_")] == ["compact", "get_settings", "hide", "list_models", "preview_voice", "retrain_voice", "set_key", "set_setting", "sleep", "stop_talking", "submit", "talk", "test_brain"]
 
 
 # ---- 0.5.0 ---------------------------------------------------------------------------
@@ -1400,3 +1400,100 @@ def test_voice_move_command():
     eng.on_move = moved.append
     eng.on_complete(1, "hey monster move to the right")
     assert moved == ["right"] and ex.calls == []
+
+
+# ---- 1.2.0: live brain, settings, conversation ----------------------------------------------------
+def test_turn_waits_longer_after_a_dangling_word():
+    eng, *_ = make()
+    eng.turn_delay = 0.9
+    assert eng.turn_delay_for("open the") == 1.8
+    assert eng.turn_delay_for("what time is it?") < 0.9
+    assert eng.turn_delay_for("write a haiku about rain") == 0.9
+
+
+def test_conversation_mode_keeps_listening_without_a_question():
+    eng, ex, client, said, fb = make_agent([[("finish", {"summary": "Done."})]])
+    eng.followup_only_on_question, eng.conversation_mode = True, True
+    eng.on_complete(1, "hey monster make a note please")
+    assert "followup" in fb
+
+
+def _brain_rig(monkeypatch, tmp_path):
+    from lazymonster.agent import Agent
+    from lazymonster.config import Config
+    from lazymonster.control import BrainControl
+    monkeypatch.setenv("APPDATA", str(tmp_path))
+    monkeypatch.setenv("OPENAI_API_KEY", "k1")
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    eng, ex, *_ = make_agent([])
+    cfg = Config()
+    ctl = BrainControl(cfg, eng, lambda c: Agent(c, ex, lambda **k: None, lambda t: None))
+    return eng, cfg, ctl
+
+
+def test_switch_brain_live(monkeypatch, tmp_path):
+    from lazymonster.agent import ClaudeClient
+    eng, cfg, ctl = _brain_rig(monkeypatch, tmp_path)
+    assert "need a Claude key" in ctl.switch("claude") and cfg.planner == "openai"
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "k2")
+    msg = ctl.switch("claude")
+    assert cfg.planner == "anthropic" and type(eng.worker.agent.client) is ClaudeClient and "Claude" in msg
+
+
+def test_go_big_by_voice(monkeypatch, tmp_path):
+    eng, cfg, ctl = _brain_rig(monkeypatch, tmp_path)
+    eng.on_brain = ctl.handle
+    spoken = []
+    eng.say = spoken.append
+    eng.on_complete(1, "hey monster use the bigger brain")
+    assert cfg.go_big and eng.worker.agent.escalation.model == cfg.escalation_model and "gpt-6-astra" in spoken[-1]
+    eng.on_complete(2, "hey monster which brain are you using")
+    assert spoken[-1].startswith("I'm using OpenAI")
+
+
+def test_settings_apply_live(monkeypatch, tmp_path):
+    from lazymonster.settings_ctl import SettingsCtl
+    eng, cfg, ctl = _brain_rig(monkeypatch, tmp_path)
+    eng.brain = ctl
+    c, events = _conv(eng)
+    class Det:
+        class head: threshold = 0.95
+        threshold = 0.95
+    det = Det()
+    s = SettingsCtl(cfg, eng, c, c.speaker, None, {"detector": det}, {"lock": None, "verify": None}, lambda: None)
+    s.set("wake_sensitivity", 0.1)
+    assert abs(det.threshold - 0.85) < 1e-9
+    s.set("conversation_mode", False)
+    assert eng.conversation_mode is False and eng.followup_window == 10.0
+    assert "Enroll" in s.set("voice_lock", True)
+    got = s.get()
+    assert got["planner"] == "openai" and got["have"]["openai"] and got["voices"]
+
+
+def test_barge_in_needs_your_voice():
+    import numpy as np
+    import time as _t
+    from lazymonster import conversation as C
+    eng, *_ = make()
+    c, events = _conv(eng)
+    eng.feedback = c.feedback
+    class Tap:
+        def raw(self, s): return np.ones(16000, dtype=np.float32) * 0.1
+    class Lock:
+        threshold = 0.7
+        def __init__(self, ok): self.ok = ok
+        def check(self, a): return (self.ok, 0.9 if self.ok else 0.2)
+    c.tap = Tap()
+    for ok, expect in ((False, 0), (True, 1)):
+        c.lock = Lock(ok)
+        c.set(C.SPEAKING); c.spoke_at = eng.clock.t - 5; c._last_check = -1e9
+        c.speaker.stopped = 0
+        for _ in range(12):
+            c.on_audio(np.ones(800, dtype=np.float32) * 0.1)
+        _t.sleep(0.1)
+        assert c.speaker.stopped == expect
+
+
+def test_version_compare():
+    from lazymonster.cli import _newer
+    assert _newer("1.2.1", "1.2.0") and not _newer("1.2.0", "1.2.0") and _newer("1.10.0", "1.9.9")

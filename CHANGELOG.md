@@ -1,5 +1,19 @@
 # Changelog
 
+## 1.2.0: settings, live brains, real conversation
+**Change anything, live**
+- **Settings panel** (gear icon, or tray > Settings…): brain (OpenAI, Claude, Local), the model (listed live from your key or server, so new models show up by themselves), a Test button, paste a key, the local address, go big, Jev, the voice with a preview, conversation mode, interrupt-by-talking, voice lock, wake sensitivity, push-to-talk key, retrain voice, left or right corner. Changes apply without a restart (push-to-talk key and Jev after one).
+- **By voice:** "switch to Claude", "use OpenAI", "use the bigger brain", "go back to the normal brain", "which brain are you using?"
+- **`monster brain`**: `--list` models, `--provider claude`, `--use <model>`, `--big on|off`, `--test`. `monster models --refresh` re-downloads the newest speech and voice models. The app checks GitHub once a day and says when an update is out (`monster update`).
+
+**Lives in the tray**
+- On Windows the window no longer has a taskbar button or a Python icon: it's a tool window with its own identity, and the tray icon is its home ("Show Lazy-Monster" on click). The Start menu entry brings up the running monster instead of starting a second one.
+
+**Conversation**
+- **Conversation mode** (on by default): after every reply it keeps listening for about 20 seconds without "Hey Monster"; "that's all" ends it. The voice lock (and Jev, if on) keep room chatter out.
+- **Interrupt by talking**: talk over the monster and it stops, if your voice passes the voice lock. Its own voice and the TV can't do it.
+- **Smarter end of turn**: after "open the…" it waits twice as long; after a finished question or a command it already understands, it answers sooner. What you said over the monster is kept for your next turn.
+
 ## 1.1.0: your brain, your corner
 - **No brain, no go.** The installer finds the keys you already have and says "Monster Brain: OpenAI. Keep it, switch brain, or make the monster go big?" With no key it asks until one works (or you quit). "Go big" (hard tasks on GPT-6 Astra or Claude Sonnet 5) is now opt-in: `go_big = true`.
 - **Local brains.** Ollama, llama.cpp, vLLM, LM Studio or any OpenAI-style endpoint (`planner = "local"`). The installer finds servers on the usual ports, lists their models, and tests that the model can call tools before accepting it, with the exact flag to fix it if not. A local brain can still go big on a cloud model if you add a key.

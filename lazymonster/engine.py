@@ -50,6 +50,9 @@ class Engine:
         self.on_move = None                          # UI: "move to the right"
         self._brainless_told = -1e9
         self.followup_only_on_question = False        # cli: True
+        self.conversation_mode = False                # stay listening after every reply (cli: from settings)
+        self.barge_t = None                           # you started talking over the monster at this time
+        self.on_brain = None                          # "switch to Claude", "go big", "which brain?"
         self.verify: Optional[Callable[[float], bool]] = None   # voice lock: is this audio (since t) you?
         self.jev = None                                         # optional decider: "was that meant for me?"
         self.armed_source = "wake"                              # wake | followup
@@ -209,7 +212,10 @@ class Engine:
                 return
             ln.fired = True
             if self.turn is None:
-                self.turn = {"parts": [], "first": ln.first_seen, "woke": False, "typed": ln.typed,
+                first = ln.first_seen
+                if self.barge_t is not None and 0 <= ln.first_seen - self.barge_t < 8:
+                    first, self.barge_t = self.barge_t, None        # include what you said over the monster
+                self.turn = {"parts": [], "first": first, "woke": False, "typed": ln.typed,
                              "source": "wake" if ln.woke else self.armed_source}
             self.turn["parts"].append(cmd)
             self.turn["woke"] = self.turn["woke"] or ln.woke
@@ -217,11 +223,28 @@ class Engine:
             if self.turn_delay <= 0 or ln.typed:
                 self._finish_turn()
 
+    _DANGLING = re.compile(r"\b(and|or|but|the|a|an|to|of|with|for|in|on|at|my|your|this|that|open|write|"
+                           r"make|search|put|about|so|then|because|like|um|uh)\W*$", re.I)
+
+    def turn_delay_for(self, text: str) -> float:
+        """How long a pause ends your turn: longer after "open the…", shorter after a
+        finished question or a sentence the instant grammar already understands."""
+        t = (text or "").strip()
+        if not t or self.turn_delay <= 0:
+            return self.turn_delay
+        if self._DANGLING.search(t) or t.endswith(","):
+            return self.turn_delay * 2.0
+        if t.endswith("?") or self.g.parse(t):
+            return self.turn_delay * 0.65
+        return self.turn_delay
+
     def poll(self) -> None:
-        """Called ~10x a second: closes the turn once you have been quiet for turn_delay."""
+        """Called ~10x a second: closes the turn once you have been quiet long enough."""
         with self._lock:
-            if self.turn and self.clock() - max(self.turn["last"], self.last_partial) >= self.turn_delay:
-                self._finish_turn()
+            if self.turn:
+                wait = self.turn_delay_for(" ".join(self.turn["parts"]))
+                if self.clock() - max(self.turn["last"], self.last_partial) >= wait:
+                    self._finish_turn()
 
     def in_session(self) -> bool:
         a = self.worker.agent
@@ -296,7 +319,7 @@ class Engine:
     def _task_done(self, ok: bool) -> None:
         """After a task, listen without the wake phrase only if the monster asked you
         something; otherwise it's back to "Hey Monster" (no picking up room chatter)."""
-        listen = not self.followup_only_on_question or self.expects_reply()
+        listen = self.conversation_mode or not self.followup_only_on_question or self.expects_reply()
         with self._lock:
             self.armed_until = self.clock() + self.followup_window if listen else 0.0
             self.armed_source = "followup"
@@ -315,6 +338,11 @@ class Engine:
         if intent.name == "exit_app":
             self.worker.cancel()
             self.go_to_sleep(cmd)
+            return
+        if intent.name in ("brain_switch", "brain_big", "brain_info"):
+            self.log(event="brain_cmd", intent=intent.name, **intent.args)
+            if self.on_brain:
+                self.say(self.on_brain(intent.name, intent.args))
             return
         if intent.name == "move_monster":
             self.log(event="move", side=intent.args.get("side"))

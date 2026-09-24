@@ -55,12 +55,16 @@ def _build(cfg: Config, dry_run: bool, logger=None, feedback=None, clock=time.mo
         if speaker is not None:
             speaker.say(t)
     worker = Worker(executor, log, synchronous=synchronous, clock=clock)
+
+    def make_agent(client):
+        ag = Agent(client, executor, log, say, max_steps=cfg.agent_max_steps, clock=clock)
+        ag.journal = True
+        return ag
     if use_agent and cfg.planner != "none":
         try:
             client = build_client(cfg)
             if client is not None:
-                worker.agent = Agent(client, executor, log, say, max_steps=cfg.agent_max_steps, clock=clock)
-                worker.agent.journal = True
+                worker.agent = make_agent(client)
                 try:
                     worker.agent.escalation = build_client(cfg, escalation=True)
                 except Exception:
@@ -73,6 +77,15 @@ def _build(cfg: Config, dry_run: bool, logger=None, feedback=None, clock=time.mo
                     logger=logger, clock=clock, say=say, on_exit=on_exit)
     if worker.agent is not None:
         worker.agent.on_sleep = engine.go_to_sleep
+    from .control import BrainControl
+
+    def make_agent_live(client):
+        ag = make_agent(client)
+        ag.on_sleep = engine.go_to_sleep
+        ag.jev = getattr(engine, "jev", None)
+        return ag
+    engine.brain = BrainControl(cfg, engine, make_agent_live)
+    engine.on_brain = engine.brain.handle
     from .jev import build_jev
     jev = build_jev(cfg, log=log)
     if jev is not None:
@@ -111,6 +124,8 @@ def _file_logger(cfg: Config):
             print(f"  finished in {ev['steps']} steps, {ev['s']} s" + (f" (first action after {fa} s)" if fa is not None else ""), flush=True)
         elif e == "not_you":
             print(f"  voice lock: not your voice (similarity {ev.get('score')}); ignored", flush=True)
+        elif e == "barge_in":
+            print(f"  you interrupted (voice {ev.get('score')})", flush=True)
         elif e == "wake_rejected":
             print(f"  wake ignored ({ev.get('why')}, score {ev.get('score')})", flush=True)
         elif e == "not_for_me":
@@ -182,6 +197,8 @@ def _start_voice(cfg, a, engine, apps, speaker, conv, on_partial=None, on_level=
                 engine.verify = lambda t0: lock.check(tap.slice(t0))
                 info["lock"] = "voice lock on"
                 info["lock_obj"] = lock
+                conv.lock = lock
+                tap.listeners.append(conv.on_audio)
                 status("voice lock: on (only your voice; typed requests and push-to-talk always work)")
         except Exception as e:
             status(f"voice lock off ({type(e).__name__}: {str(e)[:100]})")
@@ -263,7 +280,9 @@ def _conversation(cfg, engine, speaker, stop, emit=lambda ev: None):
                         user_name=windows_first_name(cfg.user_name), greet=cfg.greet)
     engine.turn_delay = cfg.turn_delay
     engine.followup_only_on_question = True
-    engine.followup_window = 10.0
+    engine.conversation_mode = cfg.conversation_mode
+    engine.followup_window = 20.0 if cfg.conversation_mode else 10.0
+    conv.barge_in = cfg.barge_in
     conv.recap = True
     if engine.worker.agent is not None:
         engine.worker.agent.on_progress = conv.progress
@@ -344,13 +363,52 @@ def _background_io():
     print(f"\n--- Lazy-Monster {__version__} background start {time.strftime('%Y-%m-%d %H:%M:%S')} ---")
 
 
+SHOW_FLAG = "show.flag"
+
+
+def _update_check(bus) -> None:
+    """Once a day: is there a newer release on GitHub? (Quiet if the repo is private or offline.)"""
+    import requests
+    while True:
+        try:
+            r = requests.get("https://api.github.com/repos/AndySync-09/Lazy-Monster/releases/latest", timeout=10,
+                             headers={"Accept": "application/vnd.github+json"})
+            if r.status_code == 200:
+                tag = r.json().get("tag_name", "").lstrip("v")
+                if tag and _newer(tag, __version__):
+                    bus.emit({"type": "note", "text": f"Update available: {tag}. Run: monster update"})
+                    bus.update = tag
+        except Exception:
+            pass
+        time.sleep(24 * 3600)
+
+
+def _newer(a: str, b: str) -> bool:
+    def parts(v):
+        return [int(x) if x.isdigit() else 0 for x in v.split(".")[:3]]
+    return parts(a) > parts(b)
+
+
+def _app_identity() -> None:
+    """Windows: our own taskbar identity (monster, not Python)."""
+    if os.name == "nt":
+        try:
+            import ctypes
+            ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("AndySync.LazyMonster")
+        except Exception:
+            pass
+
+
 def cmd_ui(a, cfg):
     import threading
     background = getattr(a, "background", False)
+    _app_identity()
     if background:
         from .service import single_instance
         if not single_instance():
-            return 0                                   # already running for this user
+            if getattr(a, "show", False):           # Start menu: bring up the monster that's already running
+                (config_dir() / SHOW_FLAG).touch()
+            return 0
         _background_io()
     from .tts import build_speaker
     from .ui.app import Api, UIBus, run_window
@@ -387,9 +445,17 @@ def cmd_ui(a, cfg):
             held["tray"] = Tray(bus, speaker, gate, det_ref, stop, conv=conv, engine=engine).start()
         except Exception as e:
             print(f"  tray icon off ({type(e).__name__}: {str(e)[:80]})")
-        voice = {"kokoro": f"Kokoro {cfg.kokoro_voice}", "openai": "OpenAI voice", "windows": "Windows voice"}.get(cfg.voice, "silent")
-        bus.emit(status_event(cfg, engine.agent_enabled, info, voice))
+        def refresh_status():
+            voice = {"kokoro": f"Kokoro {cfg.kokoro_voice}", "openai": "OpenAI voice", "windows": "Windows voice"}.get(cfg.voice, "silent")
+            bus.agent = engine.worker.agent
+            bus.emit(status_event(cfg, engine.agent_enabled, info, voice))
+        refresh_status()
+        from .settings_ctl import SettingsCtl
+        api._ctl = SettingsCtl(cfg, engine, conv, speaker, bus, det_ref,
+                               {"lock": info.get("lock_obj"), "verify": engine.verify}, refresh_status)
+        engine.brain.on_change = refresh_status
         conv.set("sleeping", 'say "Hey Monster" or type below')
+        threading.Thread(target=_update_check, args=(bus,), daemon=True).start()
 
     # "Hey Monster, sleep" shrinks to a small sleeping orb and keeps listening, in every UI mode.
     # "Hey Monster", the hotkey or a click on the orb brings the full window back. Quit is in the tray.
@@ -414,6 +480,19 @@ def cmd_ui(a, cfg):
             bus.set_orb(False)
     conv.listeners.append(orb_on_state)
     if background:
+        def show_flag_watch():                       # the Start menu shortcut asks us to show up
+            f = config_dir() / SHOW_FLAG
+            while not stop.is_set():
+                if f.exists():
+                    try:
+                        f.unlink()
+                        bus.set_orb(False)
+                        bus.window.show()
+                        conv.push_to_talk()
+                    except Exception:
+                        pass
+                time.sleep(0.5)
+        threading.Thread(target=show_flag_watch, daemon=True).start()
         seen = {"asleep_since": time.monotonic()}
 
         def on_state(state):
@@ -439,7 +518,7 @@ def cmd_ui(a, cfg):
             threading.Thread(target=auto_hide, daemon=True).start()
     print(f"Lazy-Monster {__version__} · UI · {'DRY RUN' if a.dry_run else 'LIVE'}" + (" · background" if background else ""))
     try:
-        run_window(bus, api, backend, stop, hidden=background,
+        run_window(bus, api, backend, stop, hidden=background and not getattr(a, "show", False),
                    saved_pos=(cfg.window_x, cfg.window_y) if cfg.window_x >= 0 else None)
     finally:
         stop.set()
@@ -657,6 +736,50 @@ def cmd_voice_reset(a, cfg):
     return rc
 
 
+def cmd_brain(a, cfg):
+    """See or change the brain: monster brain [--list] [--provider claude] [--use MODEL] [--big on|off] [--test]"""
+    from . import tui
+    from .config import save_setting
+    from .control import ALIASES, MODEL_FIELD, PROVIDERS, list_models
+    tui.enable()
+    if a.provider:
+        p = ALIASES.get(a.provider.lower(), a.provider.lower())
+        if p not in PROVIDERS:
+            tui.warn(f"Unknown brain {a.provider}. Use openai, claude or local."); return 1
+        cfg.planner = p
+        save_setting("planner", p)
+        tui.ok(f"Brain set to {PROVIDERS[p]}.")
+    if a.use:
+        field = MODEL_FIELD.get(cfg.planner)
+        setattr(cfg, field, a.use)
+        save_setting(field, a.use)
+        tui.ok(f"Model set to {a.use}.")
+    if a.big:
+        cfg.go_big = a.big == "on"
+        save_setting("go_big", cfg.go_big)
+        tui.ok("Going big on hard tasks." if cfg.go_big else "Normal brain for everything.")
+    tui.title("Monster Brain")
+    tui.say(f"{brain_label(cfg)}" + ("  (goes big on hard tasks)" if cfg.go_big else ""))
+    if a.list:
+        tui.title(f"Models your {PROVIDERS.get(cfg.planner, cfg.planner)} setup can use")
+        models = list_models(cfg, cfg.planner)
+        cur = getattr(cfg, MODEL_FIELD.get(cfg.planner, "openai_model"), "")
+        for m in models[:40] or ["(couldn't list models: check the key or the server)"]:
+            print(f"  {tui.L + chr(0x25cf) + tui.R if m == cur else ' '} {m}")
+        tui.dim("Switch: monster brain --use <model>")
+    if a.test:
+        from .agent import build_client
+        try:
+            build_client(cfg).chat([{"role": "user", "content": "Reply with the single word: ready"}])
+            tui.ok("The brain answered.")
+        except Exception as e:
+            tui.warn(f"The brain didn't answer: {str(e)[:160]}"); return 1
+    if a.provider or a.use or a.big:
+        tui.dim("The running monster picks this up after: monster service stop ; monster service start "
+                "(or change it live in the window's settings).")
+    return 0
+
+
 def cmd_voice_lock(a, cfg):
     from .config import save_setting
     on = a.state == "on"
@@ -714,6 +837,15 @@ def cmd_permissions(a, cfg):
 
 
 def cmd_models(a, cfg):
+    if getattr(a, "refresh", False):
+        import shutil
+        from .models import models_dir
+        for sub_ in ("kokoro", "wakeword/melspectrogram.onnx", "wakeword/embedding_model.onnx", "ov_cache"):
+            p = models_dir() / sub_
+            (shutil.rmtree if p.is_dir() else (lambda x: p.unlink(missing_ok=True)))(p) if p.exists() else None
+        for p in models_dir().glob("*__*"):                 # downloaded Whisper repos
+            shutil.rmtree(p, ignore_errors=True)
+        print("  cleared the downloaded speech and voice models; fetching the newest ones…")
     """Download and prepare on-device models, and report where they run."""
     from .stt_refine import make_refiner
     from .tts import KokoroVoice
@@ -1098,6 +1230,7 @@ def main(argv=None):
     u.add_argument("--quiet", action="store_true")
     u.add_argument("--device", help="input device index or name")
     u.add_argument("--background", action="store_true", help="start hidden; show on Hey Monster (used at sign-in)")
+    u.add_argument("--show", action="store_true", help="show the window (starts the monster if it isn't running)")
     sv = sub.add_parser("service", help="run Lazy-Monster in the background from sign-in")
     sv.add_argument("action", choices=["install", "uninstall", "start", "stop", "status"])
     wt = sub.add_parser("wake-train", help="train your personal Hey Monster wake word (NPU)")
@@ -1111,10 +1244,17 @@ def main(argv=None):
     vl = sub.add_parser("voice-lock", help="turn the voice lock on or off")
     vl.add_argument("state", choices=["on", "off"])
     sub.add_parser("update", help="update to the newest version (keeps your settings and models)")
+    br = sub.add_parser("brain", help="see or change the brain and model")
+    br.add_argument("--list", action="store_true", help="list models your key or server can use")
+    br.add_argument("--provider", help="openai, claude or local")
+    br.add_argument("--use", help="model to use")
+    br.add_argument("--big", choices=["on", "off"], help="go big on hard tasks")
+    br.add_argument("--test", action="store_true")
     sub.add_parser("permissions", help="macOS: open the privacy settings it needs")
     vt = sub.add_parser("voice-test", help="check whether the voice lock recognises a voice")
     vt.add_argument("--times", type=int, default=3)
     mo = sub.add_parser("models", help="download and prepare local speech and voice models")
+    mo.add_argument("--refresh", action="store_true", help="download the newest speech and voice models again")
     mo.add_argument("--quiet", action="store_true")
     d = sub.add_parser("do", help="run one task with the agent and watch it work")
     d.add_argument("task", nargs="+")
@@ -1134,7 +1274,7 @@ def main(argv=None):
     fn = {"run": cmd_run, "text": cmd_text, "bench-text": cmd_bench_text, "record": cmd_record,
           "bench-audio": cmd_bench_audio, "apps": cmd_apps, "do": cmd_do, "npu": cmd_npu, "doctor": cmd_doctor, "say": cmd_say, "ui": cmd_ui, "models": cmd_models,
           "wake-train": cmd_wake_train, "wake-test": cmd_wake_test, "service": cmd_service,
-          "voice-enroll": cmd_voice_enroll, "voice-lock": cmd_voice_lock, "voice-reset": cmd_voice_reset, "voices": cmd_voices, "voice-test": cmd_voice_test, "update": cmd_update, "permissions": cmd_permissions}[a.cmd]
+          "voice-enroll": cmd_voice_enroll, "voice-lock": cmd_voice_lock, "voice-reset": cmd_voice_reset, "voices": cmd_voices, "voice-test": cmd_voice_test, "update": cmd_update, "permissions": cmd_permissions, "brain": cmd_brain}[a.cmd]
     sys.exit(fn(a, cfg) or 0)
 
 

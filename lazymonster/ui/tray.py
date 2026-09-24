@@ -89,8 +89,10 @@ class Tray:
             subprocess.Popen(["cmd", "/c", "start", "Retrain Lazy-Monster", exe, "voice-reset", "--train"])
 
         menu = pystray.Menu(
-            pystray.MenuItem("Talk now", talk, default=True),
-            pystray.MenuItem("Show window", show_window),
+            pystray.MenuItem("Show Lazy-Monster", show_window, default=True),
+            pystray.MenuItem("Talk now", talk),
+            pystray.MenuItem("Settings…", lambda icon, item: (show_window(icon, item),
+                                                               self.bus.emit({"type": "open_settings"}))),
             pystray.MenuItem("Hide window", hide_window),
             pystray.MenuItem("Pause listening", toggle_pause, checked=lambda item: self.paused),
             pystray.MenuItem("Stop talking", lambda icon, item: self.speaker.interrupt()),

@@ -17,6 +17,23 @@ body{display:flex;flex-direction:column}
 #top{display:flex;align-items:center;gap:8px;padding:10px 12px 4px}
 #brand{font-weight:600;letter-spacing:-.02em;font-size:15px;white-space:nowrap}
 #chips{display:none}#brand b{color:var(--v);font-weight:600}
+#settings{position:fixed;inset:0;background:#0B0F16F2;backdrop-filter:blur(6px);z-index:20;overflow-y:auto;padding:14px 16px 20px;transform:translateX(100%);transition:transform .28s cubic-bezier(.2,.8,.2,1)}
+body.set #settings{transform:none}
+#settings h3{margin:0 0 2px;font-size:16px;display:flex;justify-content:space-between;align-items:center}
+#settings .sec{margin-top:16px;padding:12px;border:1px solid var(--line);border-radius:14px;background:#111722}
+#settings .sec b{display:block;font-size:12px;color:var(--muted);font-weight:600;margin-bottom:8px}
+#settings .row{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:6px}
+#settings .pill{border:1px solid var(--line);background:#161D2A;color:var(--text);border-radius:99px;padding:6px 12px;font:inherit;font-size:12px;cursor:pointer}
+#settings .pill.on{background:var(--lime);color:#0D1117;border-color:var(--lime);font-weight:600}
+#settings .pill.dim{opacity:.55}
+#settings select,#settings input[type=text],#settings input[type=password]{flex:1;min-width:0;background:#0D1117;border:1px solid var(--line);color:var(--text);border-radius:10px;padding:7px 9px;font:inherit;font-size:12px}
+#settings .tg{display:flex;justify-content:space-between;align-items:center;margin-top:8px;font-size:12.5px}
+#settings .sw{width:36px;height:20px;border-radius:99px;background:#2A3242;position:relative;cursor:pointer;flex:none;border:0}
+#settings .sw::after{content:"";position:absolute;left:3px;top:3px;width:14px;height:14px;border-radius:50%;background:#8A94A6;transition:left .15s,background .15s}
+#settings .sw.on{background:#C6F43240}#settings .sw.on::after{left:19px;background:var(--lime)}
+#settings .msg{font-size:12px;color:var(--lime);margin-top:8px;min-height:15px}
+#settings input[type=range]{flex:1;accent-color:#C6F432}
+#settings small{color:var(--muted);font-size:11px}
 #stateline{flex:none;height:3px;margin:6px 12px 0;border-radius:3px;background:linear-gradient(90deg,#1B2130 0%,var(--sl,#7C5CFF) 35%,#fff8 50%,var(--sl,#7C5CFF) 65%,#1B2130 100%);background-size:250% 100%;animation:slide 3.2s linear infinite;box-shadow:0 0 10px -2px var(--sl,#7C5CFF)}
 @keyframes slide{from{background-position:200% 0}to{background-position:-200% 0}}
 body[data-state=sleep]{--sl:#7C5CFF}body[data-state=listen]{--sl:#C6F432}body[data-state=speak]{--sl:#FF5FA2}
@@ -63,6 +80,7 @@ body.orb canvas{width:100%}body.orb #stage{height:100%;align-items:center}
 #acts:empty{display:none}#acts{margin:6px 12px 0}
 </style></head><body>
 <div id="top" class="pywebview-drag-region"><div id="brand">Lazy<span style="color:#8A94A6">-</span><b>Monster</b></div><div id="sp"></div>
+<button class="ib" id="gear" title="Settings"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg></button>
 <button class="ib" id="mini" title="Compact"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 12h14"/></svg></button>
 <button class="ib" id="close" title="Hide (keeps listening for Hey Monster)"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
 <div id="stateline"></div>
@@ -153,6 +171,7 @@ case'ask':set('ask');sub('say your answer, or tap');acts([['Yes','pri',()=>api()
 case'confirm':set('ask');sub('needs your OK');acts([['Approve','pri',()=>api().submit('yes')],['Cancel','',()=>api().submit('no')]]);break;
 case'suggest':if(ev.text)acts([['Yes, '+ev.text.replace(/\?$/,'').replace(/^want me to /i,''),'pri',()=>api().submit('yes')],['No','',()=>api().submit('no')]]);break;
 case'done':set(ev.ok?'done':'error');sub(ev.sub||'');break;
+case'open_settings':window.lmOpenSettings&&window.lmOpenSettings();break;
 case'orb':document.body.classList.toggle('orb',!!ev.on);break;
 case'status':{const S=ev;const e=$('stEar');$('stEarT').textContent=S.wake_dev?S.wake_dev:'ears';e.title=S.wake_title||'Wake word';
  const b=$('stBrain');$('stBrainT').textContent=S.brain||'no brain';b.title=S.brain_title||'';b.classList.toggle('none',!S.brain);b.classList.toggle('big',!!S.big);
@@ -160,4 +179,66 @@ case'status':{const S=ev;const e=$('stEar');$('stEarT').textContent=S.wake_dev?S
  $('shackle').setAttribute('d',S.lock?'M8 11V8a4 4 0 0 1 8 0v3':'M8 11V8a4 4 0 0 1 7.5-2');$('stChips').title=S.chips_title||'';break;}
 case'chips':$('chips').innerHTML='';(ev.items||[]).forEach(t=>{const s=document.createElement('span');s.className='chip';s.textContent=t;$('chips').appendChild(s);});break;}}};
 say('');sub('say "Hey Monster"');
+</script>
+<div id="settings" aria-label="Settings">
+ <h3>Settings <button class="ib" id="setClose" title="Close">&#x2715;</button></h3>
+ <small id="sVer"></small>
+ <div class="sec"><b>Brain</b>
+  <div class="row" id="sProv"></div>
+  <div class="row"><select id="sModel"></select><button class="pill" id="sTest">Test</button></div>
+  <div class="row" id="sKeyRow"><input type="password" id="sKey" placeholder="Paste API key"><button class="pill" id="sKeySave">Save key</button></div>
+  <div class="row" id="sLocalRow"><input type="text" id="sLocal" placeholder="http://localhost:11434/v1"><button class="pill" id="sLocalSave">Save</button></div>
+  <div class="tg">Go big on hard tasks <button class="sw" id="sBig"></button></div>
+  <div class="tg">Jev for quick decisions <button class="sw" id="sJev"></button></div>
+  <div class="msg" id="sBrainMsg"></div>
+ </div>
+ <div class="sec"><b>Voice</b>
+  <div class="row"><select id="sVoice"></select><button class="pill" id="sPlay">Play</button></div>
+ </div>
+ <div class="sec"><b>Listening</b>
+  <div class="tg">Conversation mode <button class="sw" id="sConv"></button></div>
+  <small>Keeps listening after each reply. "That's all" ends it.</small>
+  <div class="tg">Interrupt by talking <button class="sw" id="sBarge"></button></div>
+  <div class="tg">Voice lock (only my voice) <button class="sw" id="sLock"></button></div>
+  <div class="row"><small style="flex:none">Wake word</small><input type="range" id="sSens" min="-0.2" max="0.2" step="0.05"><small id="sSensT" style="flex:none;width:70px;text-align:right"></small></div>
+  <div class="row"><small style="flex:none">Push-to-talk</small><input type="text" id="sPtt"></div>
+  <div class="row"><button class="pill" id="sRetrain">Retrain my voice</button></div>
+ </div>
+ <div class="sec"><b>Position</b>
+  <div class="row"><button class="pill" data-side="left">Left corner</button><button class="pill" data-side="right">Right corner</button></div>
+  <small>Or just drag the window; it remembers.</small>
+ </div>
+ <div class="msg" id="sMsg"></div>
+</div>
+<script>
+(function(){const $=id=>document.getElementById(id),A=()=>window.pywebview&&window.pywebview.api;let S=null;
+const NAMES={openai:'OpenAI',anthropic:'Claude',local:'Local'};
+function flash(el,t){$(el).textContent=t||'';clearTimeout(flash[el]);flash[el]=setTimeout(()=>$(el).textContent='',6000);}
+function sw(id,on){$(id).classList.toggle('on',!!on);}
+async function models(p){const sel=$('sModel');sel.innerHTML='<option>loading models\u2026</option>';let list=[];try{list=await A().list_models(p);}catch(e){}
+ const cur=S.models[p];if(cur&&!list.includes(cur))list.unshift(cur);sel.innerHTML='';(list.length?list:[cur||'']).forEach(m=>{const o=document.createElement('option');o.value=o.textContent=m;if(m===cur)o.selected=true;sel.appendChild(o);});}
+function paintProv(){const p=S.shown||S.planner;$('sKeyRow').style.display=p==='local'?'none':'flex';$('sLocalRow').style.display=p==='local'?'flex':'none';models(p);}
+function paint(){$('sVer').textContent='Lazy-Monster '+S.version+' \u00b7 '+S.brain;
+ const pr=$('sProv');pr.innerHTML='';['openai','anthropic','local'].forEach(p=>{const b=document.createElement('button');b.className='pill'+(S.planner===p?' on':'')+(S.have[p]?'':' dim');b.textContent=NAMES[p];
+  b.onclick=async()=>{S.shown=p;paintProv();if(S.have[p]){flash('sBrainMsg',await A().set_setting('planner',p));const keep=p;S=await A().get_settings();S.shown=keep;paint();}else{flash('sBrainMsg',p==='local'?'Add your local address below.':'Paste your '+NAMES[p]+' key below.');}};pr.appendChild(b);});
+ paintProv();sw('sBig',S.go_big);sw('sJev',S.decider==='jev');sw('sConv',S.conversation_mode);sw('sBarge',S.barge_in);sw('sLock',S.voice_lock);
+ const v=$('sVoice');v.innerHTML='';S.voices.forEach(([k,d])=>{const o=document.createElement('option');o.value=k;o.textContent=k+'  \u00b7 '+d;if(k===S.voice)o.selected=true;v.appendChild(o);});
+ $('sSens').value=S.wake_sensitivity;$('sSensT').textContent=S.wake_sensitivity>0?'more eager':S.wake_sensitivity<0?'more strict':'balanced';$('sPtt').value=S.push_to_talk;$('sLocal').value=S.local_base_url||'';}
+async function open(){if(!A())return;S=await A().get_settings();S.shown=S.planner;paint();document.body.classList.add('set');}
+$('gear').onclick=()=>document.body.classList.contains('set')?document.body.classList.remove('set'):open();
+$('setClose').onclick=()=>document.body.classList.remove('set');
+$('sModel').onchange=async e=>flash('sBrainMsg',await A().set_setting('model',{provider:S.shown||S.planner,model:e.target.value}));
+$('sTest').onclick=async()=>{flash('sBrainMsg','Asking the brain\u2026');flash('sBrainMsg',await A().test_brain());};
+$('sKeySave').onclick=async()=>{const p=S.shown||S.planner;flash('sBrainMsg',await A().set_key(p,$('sKey').value));$('sKey').value='';S=await A().get_settings();S.shown=p;paint();};
+$('sLocalSave').onclick=async()=>{flash('sBrainMsg',await A().set_setting('local_base_url',$('sLocal').value));S=await A().get_settings();S.shown='local';paint();};
+const KEYS={sBig:['go_big',s=>s.go_big],sJev:['decider',s=>s.decider==='jev'],sConv:['conversation_mode',s=>s.conversation_mode],sBarge:['barge_in',s=>s.barge_in],sLock:['voice_lock',s=>s.voice_lock]};
+Object.entries(KEYS).forEach(([id,[key,get]])=>$(id).onclick=async()=>{const on=!$(id).classList.contains('on');sw(id,on);flash(id==='sBig'||id==='sJev'?'sBrainMsg':'sMsg',await A().set_setting(key,on));S=await A().get_settings();sw(id,get(S));});
+$('sVoice').onchange=async e=>flash('sMsg',await A().set_setting('voice',e.target.value));
+$('sPlay').onclick=async()=>flash('sMsg',await A().preview_voice($('sVoice').value));
+$('sSens').onchange=async e=>{const v=parseFloat(e.target.value);$('sSensT').textContent=v>0?'more eager':v<0?'more strict':'balanced';flash('sMsg',await A().set_setting('wake_sensitivity',v));};
+$('sPtt').onchange=async e=>flash('sMsg',await A().set_setting('push_to_talk',e.target.value));
+$('sRetrain').onclick=async()=>flash('sMsg',await A().retrain_voice());
+document.querySelectorAll('#settings [data-side]').forEach(b=>b.onclick=async()=>flash('sMsg',await A().set_setting('side',b.dataset.side)));
+window.lmOpenSettings=open;})();
 </script></body></html>
+

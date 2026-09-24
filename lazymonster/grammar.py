@@ -54,6 +54,12 @@ RULES: List[Rule] = [
     ("brightness_set", _r(rf"(?:set |change |turn )?{_THE}brightness (?:to |at )?(?P<n>\d{{1,3}})(?: percent)?"),
      lambda m: {"level": min(int(m["n"]), 100)}),
     ("sleep", _r(rf"put {_THE}{_PC} to sleep|sleep {_THE}{_PC}|{_PC} sleep"), lambda m: {}),
+    ("brain_switch", _r(r"(?:switch|change|swap)(?: your)?(?: brain)? to (claude|anthropic|openai|open ai|gpt|chat ?gpt|local|ollama|llama|the local model)"
+                        r"|use (claude|openai|open ai|gpt|the local model|local)(?: as (?:your|the) brain)?"),
+     lambda m: {"to": (m.group(1) or m.group(2))}),
+    ("brain_big", _r(r"(?:use the )?(bigger|big|stronger|smarter) brain|go big|(?:use the )?(normal|regular|smaller|cheaper) brain|stop going big"),
+     lambda m: {"on": "no" if (m.group(2) or "stop" in m.group(0)) else "yes"}),
+    ("brain_info", _r(r"(?:what|which) (?:brain|model|ai) (?:are you using|do you use|is this|are you)|what'?s your brain"), lambda m: {}),
     ("move_monster", _r(r"(?:move|go|slide|scoot)(?: yourself| over)?(?: to)?(?: the)? (left|right)(?: side| corner)?"),
      lambda m: {"side": m.group(1)}),
     ("exit_app", _r(r"(?:(?:you can|can you|please|now|okay|ok|just|man|dude)\s+)*(?:go\s+)?(?:to\s+|back to\s+)?sleep(?:\s+(?:now|please|man|dude))*"

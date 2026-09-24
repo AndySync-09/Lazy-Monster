@@ -294,7 +294,7 @@
     $lnk = Join-Path $env:APPDATA "Microsoft\Windows\Start Menu\Programs\Lazy-Monster.lnk"
     $sc = (New-Object -ComObject WScript.Shell).CreateShortcut($lnk)
     $sc.TargetPath = Join-Path $scripts "monsterw.exe"
-    $sc.Arguments = "ui"
+    $sc.Arguments = "ui --background --show"          # opens the running monster, or starts it
     $sc.WorkingDirectory = $App
     $sc.IconLocation = Join-Path $App "docs\assets\brand\lazy-monster.ico"
     $sc.Description = "Lazy-Monster voice agent"

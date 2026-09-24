@@ -48,6 +48,14 @@ class AudioTap:
         self.stream.start()
         return self
 
+    def raw(self, seconds: float):
+        """The last few seconds exactly as the mic heard them (nothing cut out)."""
+        import numpy as np
+        t0 = self.clock() - seconds
+        with self.lock:
+            parts = [b for (t, b) in self.buf if t >= t0]
+        return np.concatenate(parts) if parts else np.zeros(0, dtype="float32")
+
     def mark_speaking(self, on: bool) -> None:
         now = self.clock()
         with self.lock:

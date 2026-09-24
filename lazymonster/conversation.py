@@ -36,6 +36,9 @@ class Conversation:
         self.recap = False                      # cli: welcome-back recap from the journal on first wake
         self.woke_at = 0.0
         self.confirm_wake = None                # cli: second opinion (Whisper hears "monster", voice lock hears you)
+        self.lock = None                        # voice lock: lets you interrupt just by talking
+        self.barge_in = True
+        self._loud, self._checking, self._last_check = 0.0, False, -1e9
         self.greet_every = 1800.0               # say "Hi Andy" at most every 30 minutes; otherwise just the chime
         self._greeted_at = -1e9
         self.listeners = []                     # callables(state) — e.g. show the window on wake
@@ -194,6 +197,35 @@ class Conversation:
         phrase = PROGRESS.get(tool)
         if phrase:
             threading.Thread(target=self.speaker.say, args=(phrase,), daemon=True).start()
+
+    # ---- interrupting by just talking -----------------------------------------------------
+    def on_audio(self, block) -> None:
+        """Mic blocks while the monster talks. Sustained speech that passes the voice lock
+        stops it: its own voice (or the TV) can't, because they aren't you."""
+        if self.state != SPEAKING or self.lock is None or not self.barge_in or self._checking:
+            self._loud = 0.0
+            return
+        import numpy as np
+        rms = float(np.sqrt(np.mean(np.asarray(block, dtype=np.float32) ** 2)))
+        self._loud = self._loud + len(block) / 16000 if rms > 0.02 else max(0.0, self._loud - 0.05)
+        now = self.clock()
+        if self._loud < 0.5 or now - self._last_check < 0.7 or now - self.spoke_at < 0.6:
+            return
+        self._checking, self._last_check = True, now
+        tap = getattr(self, "tap", None)
+
+        def check():
+            try:
+                audio = tap.raw(1.0) if tap is not None else None
+                ok, score = self.lock.check(audio) if audio is not None and len(audio) else (False, -1)
+                if ok or (score >= 0 and score >= self.lock.threshold - 0.08):
+                    self.engine.barge_t = self.clock() - 1.0
+                    self.speaker.interrupt()
+                    self.engine.log(event="barge_in", score=round(float(score), 3))
+                    self.engine.wake_up("barge-in")
+            finally:
+                self._checking, self._loud = False, 0.0
+        threading.Thread(target=check, daemon=True).start()
 
     # ---- wake word -------------------------------------------------------------------
     def on_wake(self, score: float) -> None:

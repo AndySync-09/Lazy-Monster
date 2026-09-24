@@ -45,6 +45,8 @@ class Config:
     wake_engine: str = "auto"        # auto (NPU model if trained, plus transcript) | transcript
     wake_sensitivity: float = 0.0    # raise (e.g. 0.1) if it misses you; lower if it wakes by itself
     idle_gate: bool = True           # with the NPU wake word, pause the CPU transcriber while idle
+    conversation_mode: bool = True   # keep listening ~20 s after every reply ("that's all" ends it)
+    barge_in: bool = True            # talk over the monster to interrupt it (needs the voice lock)
     wake_confirm: bool = True        # second opinion before waking: Whisper must hear "monster" (and the voice lock, you)
     turn_delay: float = 0.9          # seconds of quiet that end your turn (a pause mid-sentence is fine)
     chimes: bool = True              # three soft sounds: wake, done, error

@@ -47,6 +47,8 @@ On a Mac: `stt_model_mac_arm` (an MLX Whisper repo or folder) and `stt_model_mac
 
 ## 5. The brain, and Jev
 
+Quickest: the **gear icon** in the window (or tray > Settings…). Pick OpenAI, Claude or Local, choose a model from the live list, paste a key, press Test. Or say "Hey Monster, switch to Claude" / "use the bigger brain", or run `monster brain --list`.
+
 The brain writes and plans: OpenAI or Claude, chosen during install. Change it later:
 
 ```toml
