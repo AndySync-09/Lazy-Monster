@@ -1759,3 +1759,29 @@ def test_watchdog_gives_up_after_repeated_crashes(tmp_path, monkeypatch):
     monkeypatch.setattr(watchdog.subprocess, "call", lambda cmd, env, creationflags: calls.append(1) or 1)
     monkeypatch.setattr(watchdog.time, "sleep", lambda s: None)
     assert watchdog.supervise(["ui", "--background"]) == 1 and len(calls) == watchdog.MAX_RESTARTS + 1
+
+
+# ---- 1.6.0: the quick brain on the NPU -----------------------------------------------------------
+def test_quick_brain_parses_its_json():
+    from lazymonster.npu_brain import parse
+    assert parse('{"tool": "open_app", "args": {"app": "Spotify"}, "say": "Opening."}')["tool"] == "open_app"
+    assert parse("Sure! {'tool': 'mute', 'args': {}}")["tool"] == "mute"
+    assert parse("I think you should open notepad")["tool"] == "hand_off"
+
+
+def test_quick_brain_does_simple_things_and_hands_off_the_rest():
+    from lazymonster.config import Config
+    eng, ex, client, said, fb = make_agent([[("finish", {"summary": "Built the game."})]])
+    agent = eng.worker.agent
+    agent.cfg = Config(); agent.cfg.quick_brain = True
+    from lazymonster.intents import validate
+    class Q:
+        def handle(self, task):
+            if "spotify" in task:
+                return validate("open_app", {"app": "Spotify"}, source="agent"), "Opening Spotify.", 0.4
+            return None
+    agent.quick = Q()
+    agent.run("open spotify please")
+    assert [c.name for c in ex.calls] == ["open_app"] and said[-1] == "Opening Spotify." and client.seen == []
+    agent.run("build a snake game")
+    assert client.seen and said[-1].startswith("Built the game.")          # handed to the main brain

@@ -84,6 +84,8 @@ def _build(cfg: Config, dry_run: bool, logger=None, feedback=None, clock=time.mo
         ag = make_agent(client)
         ag.on_sleep = engine.go_to_sleep
         ag.jev = getattr(engine, "jev", None)
+        from . import npu_brain
+        ag.quick = npu_brain._quick
         return ag
     engine.brain = BrainControl(cfg, engine, make_agent_live)
     engine.on_brain = engine.brain.handle
@@ -127,6 +129,8 @@ def _file_logger(cfg: Config):
             print(f"  voice lock: not your voice (similarity {ev.get('score')}); ignored", flush=True)
         elif e == "barge_in":
             print(f"  you interrupted (voice {ev.get('score')})", flush=True)
+        elif e == "quick_handoff":
+            print(f"  quick brain: handed to the main brain: {ev.get('text')}", flush=True)
         elif e == "wake_rejected":
             print(f"  wake ignored ({ev.get('why')}, score {ev.get('score')})", flush=True)
         elif e == "not_for_me":
@@ -304,6 +308,8 @@ def status_event(cfg, agent_enabled: bool, info: dict, voice: str) -> dict:
              "claude": "Claude", "local": "Local \u00b7 " + (cfg.local_model or "model")}.get(p, "")
     if (cfg.decider or "") == "jev" and short:
         short += " + Jev"
+    if info.get("quick") and short:
+        short += " + NPU"
     return {"type": "status", "wake_dev": dev or "ears",
             "wake_title": f"{wake}. {info.get('stt', '')}." + (f" Push-to-talk: {info['ptt']}." if info.get("ptt") else ""),
             "brain": short if agent_enabled else "", "big": bool(cfg.go_big and agent_enabled),
@@ -488,6 +494,19 @@ def cmd_ui(a, cfg):
         Scheduler(lambda r, late: threading.Thread(target=conv.remind, args=(r, late), daemon=True).start()).run(stop)
         conv.set("sleeping", 'say "Hey Monster" or type below')
         threading.Thread(target=_update_check, args=(bus,), daemon=True).start()
+        if cfg.quick_brain:
+            def load_quick():
+                from . import npu_brain
+                status("loading the quick brain on the NPU…")
+                qb = npu_brain.load(cfg)
+                if qb is not None and engine.worker.agent is not None:
+                    engine.worker.agent.quick = qb
+                    status(f"quick brain: {cfg.quick_brain_model.split('/')[-1]} on {qb.device} (ready in {qb.load_s:.1f} s)")
+                    info["quick"] = qb.device
+                    refresh_status()
+                else:
+                    status("quick brain: off (not downloaded, or the NPU refused it; run: monster bench-brain)")
+            threading.Thread(target=load_quick, daemon=True).start()
         if os.environ.get("LM_RESTARTED"):
             bus.emit({"type": "note", "text": "I restarted after a crash. Report: " + os.environ["LM_RESTARTED"]})
 
@@ -788,6 +807,12 @@ def cmd_brain(a, cfg):
         setattr(cfg, field, a.use)
         save_setting(field, a.use)
         tui.ok(f"Model set to {a.use}.")
+    if a.quick:
+        if a.quick == "on" and not cfg.quick_brain_model:
+            tui.warn("Pick a quick brain first: monster bench-brain"); return 1
+        cfg.quick_brain = a.quick == "on"
+        save_setting("quick_brain", cfg.quick_brain)
+        tui.ok(f"Quick brain {'on' if cfg.quick_brain else 'off'} ({cfg.quick_brain_model or 'none'}).")
     if a.big:
         cfg.go_big = a.big == "on"
         save_setting("go_big", cfg.go_big)
@@ -808,7 +833,7 @@ def cmd_brain(a, cfg):
             tui.ok("The brain answered.")
         except Exception as e:
             tui.warn(f"The brain didn't answer: {str(e)[:160]}"); return 1
-    if a.provider or a.use or a.big:
+    if a.provider or a.use or a.big or a.quick:
         tui.dim("The running monster picks this up after: monster service stop ; monster service start "
                 "(or change it live in the window's settings).")
     return 0
@@ -900,6 +925,57 @@ def cmd_bench_vision(a, cfg):
         except Exception as e:
             tui.warn(f"{dev}: {type(e).__name__}: {str(e).splitlines()[0][:140]}")
     tui.dim("Paste this output back so we can decide where on-device vision should run.")
+    return 0
+
+
+def cmd_bench_brain(a, cfg):
+    """Try small models on the NPU as the quick brain: speed and how often they pick the right tool."""
+    from . import npu_brain as nb
+    from . import tui
+    from .config import save_setting
+    from .models import models_dir
+    tui.enable()
+    if a.mirror:
+        os.environ["HF_ENDPOINT"] = "https://hf-mirror.com"
+    tui.title(f"Quick brain on the {a.device}: {len(nb.TESTS)} everyday requests each")
+    best = None
+    for repo in ([a.model] if a.model else nb.CANDIDATES):
+        tui.say(repo)
+        if not nb.model_path(repo).exists() or a.redownload:
+            tui.dim("  downloading (resumes if interrupted)…")
+            if not nb.download(repo, say=tui.dim):
+                tui.warn("  couldn't download it; try --mirror")
+                continue
+        try:
+            qb = nb.QuickBrain(nb.model_path(repo), a.device, models_dir() / "ov_cache")
+        except Exception as e:
+            tui.warn(f"  the {a.device} refused it: {type(e).__name__}: {str(e).splitlines()[0][:120]}")
+            continue
+        right, times = 0, []
+        qb.ask("open notepad")                                   # warm-up
+        for req, want in nb.TESTS:
+            try:
+                d, secs = qb.ask(req)
+            except Exception as e:
+                d, secs = {"tool": f"error {type(e).__name__}"}, 0.0
+            got = d.get("tool")
+            ok = got == want
+            right += ok
+            times.append(secs)
+            print(f"   {'ok ' if ok else 'MISS'} {secs:4.1f} s  {req[:44]:<44} -> {got}")
+        acc = right / len(nb.TESTS)
+        med = sorted(times)[len(times) // 2]
+        tui.ok(f"  {right}/{len(nb.TESTS)} right, typical {med:.1f} s per request, loaded in {qb.load_s:.1f} s")
+        if acc >= 0.75 and (best is None or (acc, -med) > (best[1], -best[2])):
+            best = (repo, acc, med)
+        del qb
+    if best:
+        save_setting("quick_brain_model", best[0])
+        save_setting("quick_brain_device", a.device)
+        tui.ok(f"Chosen: {best[0]} ({best[1]:.0%} right, {best[2]:.1f} s). Turn it on: monster brain --quick on "
+               "(or Settings > Brain > Quick brain on the NPU), then restart the monster.")
+    else:
+        tui.warn("None was right often enough (75%) to handle requests on its own. The main brain keeps doing everything.")
     return 0
 
 
@@ -1380,6 +1456,11 @@ def main(argv=None):
     vl = sub.add_parser("voice-lock", help="turn the voice lock on or off")
     vl.add_argument("state", choices=["on", "off"])
     sub.add_parser("update", help="update to the newest version (keeps your settings and models)")
+    bb = sub.add_parser("bench-brain", help="try small models on the NPU as the quick brain")
+    bb.add_argument("--device", default="NPU", choices=["NPU", "GPU", "CPU"])
+    bb.add_argument("--model", default="")
+    bb.add_argument("--mirror", action="store_true")
+    bb.add_argument("--redownload", action="store_true")
     cr = sub.add_parser("crashes", help="show the latest crash report")
     cr.add_argument("--lines", type=int, default=60)
     bv = sub.add_parser("bench-vision", help="time on-device screen reading (OCR) and a small vision model on NPU/GPU/CPU")
@@ -1393,6 +1474,7 @@ def main(argv=None):
     br.add_argument("--use", help="model to use")
     br.add_argument("--big", choices=["on", "off"], help="go big on hard tasks")
     br.add_argument("--test", action="store_true")
+    br.add_argument("--quick", choices=["on", "off"], help="simple requests on the NPU quick brain")
     sub.add_parser("permissions", help="macOS: open the privacy settings it needs")
     vt = sub.add_parser("voice-test", help="check whether the voice lock recognises a voice")
     vt.add_argument("--times", type=int, default=3)
@@ -1417,7 +1499,7 @@ def main(argv=None):
     fn = {"run": cmd_run, "text": cmd_text, "bench-text": cmd_bench_text, "record": cmd_record,
           "bench-audio": cmd_bench_audio, "apps": cmd_apps, "do": cmd_do, "npu": cmd_npu, "doctor": cmd_doctor, "say": cmd_say, "ui": cmd_ui, "models": cmd_models,
           "wake-train": cmd_wake_train, "wake-test": cmd_wake_test, "service": cmd_service,
-          "voice-enroll": cmd_voice_enroll, "voice-lock": cmd_voice_lock, "voice-reset": cmd_voice_reset, "voices": cmd_voices, "voice-test": cmd_voice_test, "update": cmd_update, "permissions": cmd_permissions, "brain": cmd_brain, "bench-vision": cmd_bench_vision, "crashes": cmd_crashes}[a.cmd]
+          "voice-enroll": cmd_voice_enroll, "voice-lock": cmd_voice_lock, "voice-reset": cmd_voice_reset, "voices": cmd_voices, "voice-test": cmd_voice_test, "update": cmd_update, "permissions": cmd_permissions, "brain": cmd_brain, "bench-vision": cmd_bench_vision, "crashes": cmd_crashes, "bench-brain": cmd_bench_brain}[a.cmd]
     sys.exit(fn(a, cfg) or 0)
 
 

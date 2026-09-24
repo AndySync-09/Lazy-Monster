@@ -199,6 +199,7 @@ class Agent:
         self.max_questions = 2                    # per task
         self.approved = {}                        # (tool, project) -> time: say yes once per project per session
         self.jev = None                           # optional decider (jev.py): routing, difficulty, yes/no
+        self.quick = None                         # optional quick brain on the NPU (npu_brain.py)
 
     def _system(self) -> str:
         if not self.journal:
@@ -375,7 +376,41 @@ class Agent:
         self.log(event="approval", intent=intent.name, ok=ok, text=ans or "")
         return ok, ("the user said yes" if ok else f"the user did not approve ({ans or 'no answer'}); do not retry")
 
+    def _quick_path(self, task: str) -> bool:
+        """Simple one-step requests: the NPU model picks the tool; anything else goes to the main brain."""
+        try:
+            r = self.quick.handle(task)
+        except Exception as e:
+            self.log(event="quick_error", error=f"{type(e).__name__}: {str(e)[:80]}")
+            return False
+        if r is None:
+            self.log(event="quick_handoff", text=task[:80])
+            return False
+        intent, say, secs = r
+        self.log(event="agent_think", step=0, ms=round(secs * 1000), candidates=[{"tool": intent.name, "p": 1.0}],
+                 chosen=[intent.name], source="npu")
+        if intent.name == "system_status":
+            from . import sysinfo
+            say = sysinfo.quick_answer(sysinfo.snapshot())
+            ok = True
+        elif intent.name in ("set_reminder", "list_reminders"):
+            from . import reminders
+            say = (reminders.add(intent.args["what"], intent.args["when"])[1] if intent.name == "set_reminder"
+                   else reminders.describe())
+            ok = True
+        else:
+            ok, text, _ = self.ex.run(intent)
+            self.log(event="step", n=1, of=1, intent=intent.name, ok=ok, msg=str(text)[:160], exec_ms=0)
+            if not ok:
+                return False                                     # didn't work: let the main brain try properly
+        self.log(event="agent_done", steps=1, s=round(secs, 1), brain="npu")
+        self.say(say)
+        return True
+
     def run(self, task: str) -> bool:
+        if self.quick is not None and getattr(getattr(self, "cfg", None), "quick_brain", False):
+            if self._quick_path(task):
+                return True
         self.cancel.clear()
         results = []
         client = self.client

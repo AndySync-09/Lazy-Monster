@@ -31,6 +31,7 @@ class SettingsCtl:
                 "voice_lock": c.voice_lock and self.engine.verify is not None, "voice_lock_ready": self.lock_ref.get("lock") is not None,
                 "conversation_mode": self.engine.conversation_mode, "barge_in": self.conv.barge_in,
                 "push_to_talk": c.push_to_talk, "version": __version__,
+                "quick_brain": c.quick_brain, "quick_brain_model": c.quick_brain_model,
                 "skin": c.skin, "outfit": c.outfit, "pet_mode": c.pet_mode, "send_screenshots": c.send_screenshots}
 
     def models(self, provider: str):
@@ -97,6 +98,20 @@ class SettingsCtl:
             if self.bus is not None:
                 self.bus.emit(skin_event(c))
             msg = "Looking good."
+        elif key == "quick_brain":
+            if value and not c.quick_brain_model:
+                return "Pick a quick brain first: run  monster bench-brain  in a terminal."
+            c.quick_brain = bool(value)
+            save_setting("quick_brain", c.quick_brain)
+            from . import npu_brain
+            a = self.engine.worker.agent
+            if a is not None:
+                if value:
+                    threading.Thread(target=lambda: setattr(a, "quick", npu_brain.load(c)), daemon=True).start()
+                    msg = "Loading the quick brain on the NPU (about 30 s the first time)."
+                else:
+                    a.quick = None
+                    msg = "Quick brain off: the main brain does everything."
         elif key == "pet_mode":
             c.pet_mode = bool(value)
             save_setting("pet_mode", c.pet_mode)

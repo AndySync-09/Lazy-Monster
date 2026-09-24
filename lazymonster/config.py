@@ -53,6 +53,9 @@ class Config:
     acks: bool = True                # say "On it" when a task starts
     greet: bool = True               # "Hi Andy, how can I help?" after a bare "Hey Monster"
     user_name: str = ""              # empty = first name from your Windows account
+    quick_brain: bool = False        # simple one-step requests handled by a small model on the NPU
+    quick_brain_model: str = ""      # chosen by: monster bench-brain
+    quick_brain_device: str = "NPU"
     skin: str = "classic"            # classic | mint | sunset | midnight | bubblegum
     outfit: str = "auto"             # auto (seasonal) | "" | party | diwali | santa | cricket | shades
     pet_mode: bool = False           # while napping, walk along the taskbar

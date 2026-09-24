@@ -227,6 +227,7 @@ say('');sub('say "Hey Monster"');
   <div class="row" id="sLocalRow"><input type="text" id="sLocal" placeholder="http://localhost:11434/v1"><button class="pill" id="sLocalSave">Save</button></div>
   <div class="tg">Go big on hard tasks <button class="sw" id="sBig"></button></div>
   <div class="tg">Jev for quick decisions <button class="sw" id="sJev"></button></div>
+  <div class="tg">Quick brain on the NPU (simple requests, offline) <button class="sw" id="sQuick"></button></div>
   <div class="msg" id="sBrainMsg"></div>
  </div>
  <div class="sec"><b>Voice</b>
@@ -269,7 +270,7 @@ function paintProv(){const p=S.shown||S.planner;$('sKeyRow').style.display=p==='
 function paint(){$('sVer').textContent='Lazy-Monster '+S.version+' \u00b7 '+S.brain;
  const pr=$('sProv');pr.innerHTML='';['openai','anthropic','local'].forEach(p=>{const b=document.createElement('button');b.className='pill'+(S.planner===p?' on':'')+(S.have[p]?'':' dim');b.textContent=NAMES[p];
   b.onclick=async()=>{S.shown=p;paintProv();if(S.have[p]){flash('sBrainMsg',await A().set_setting('planner',p));const keep=p;S=await A().get_settings();S.shown=keep;paint();}else{flash('sBrainMsg',p==='local'?'Add your local address below.':'Paste your '+NAMES[p]+' key below.');}};pr.appendChild(b);});
- paintProv();sw('sBig',S.go_big);sw('sJev',S.decider==='jev');sw('sConv',S.conversation_mode);sw('sBarge',S.barge_in);sw('sLock',S.voice_lock);
+ paintProv();sw('sQuick',S.quick_brain);sw('sBig',S.go_big);sw('sJev',S.decider==='jev');sw('sConv',S.conversation_mode);sw('sBarge',S.barge_in);sw('sLock',S.voice_lock);
  const v=$('sVoice');v.innerHTML='';S.voices.forEach(([k,d])=>{const o=document.createElement('option');o.value=k;o.textContent=k+'  \u00b7 '+d;if(k===S.voice)o.selected=true;v.appendChild(o);});
  sw('sShots',S.send_screenshots);if(S.skin)$('sSkin').value=S.skin;$('sOutfit').value=S.outfit||'';sw('sPet',S.pet_mode);
  $('sSens').value=S.wake_sensitivity;$('sSensT').textContent=S.wake_sensitivity>0?'more eager':S.wake_sensitivity<0?'more strict':'balanced';$('sPtt').value=S.push_to_talk;$('sLocal').value=S.local_base_url||'';}
@@ -288,8 +289,8 @@ $('sModel').onchange=async e=>flash('sBrainMsg',await A().set_setting('model',{p
 $('sTest').onclick=async()=>{flash('sBrainMsg','Asking the brain\u2026');flash('sBrainMsg',await A().test_brain());};
 $('sKeySave').onclick=async()=>{const p=S.shown||S.planner;flash('sBrainMsg',await A().set_key(p,$('sKey').value));$('sKey').value='';S=await A().get_settings();S.shown=p;paint();};
 $('sLocalSave').onclick=async()=>{flash('sBrainMsg',await A().set_setting('local_base_url',$('sLocal').value));S=await A().get_settings();S.shown='local';paint();};
-const KEYS={sBig:['go_big',s=>s.go_big],sJev:['decider',s=>s.decider==='jev'],sConv:['conversation_mode',s=>s.conversation_mode],sBarge:['barge_in',s=>s.barge_in],sLock:['voice_lock',s=>s.voice_lock]};
-Object.entries(KEYS).forEach(([id,[key,get]])=>$(id).onclick=async()=>{const on=!$(id).classList.contains('on');sw(id,on);flash(id==='sBig'||id==='sJev'?'sBrainMsg':'sMsg',await A().set_setting(key,on));S=await A().get_settings();sw(id,get(S));});
+const KEYS={sQuick:['quick_brain',s=>s.quick_brain],sBig:['go_big',s=>s.go_big],sJev:['decider',s=>s.decider==='jev'],sConv:['conversation_mode',s=>s.conversation_mode],sBarge:['barge_in',s=>s.barge_in],sLock:['voice_lock',s=>s.voice_lock]};
+Object.entries(KEYS).forEach(([id,[key,get]])=>$(id).onclick=async()=>{const on=!$(id).classList.contains('on');sw(id,on);flash(id==='sBig'||id==='sJev'||id==='sQuick'?'sBrainMsg':'sMsg',await A().set_setting(key,on));S=await A().get_settings();sw(id,get(S));});
 $('sVoice').onchange=async e=>flash('sMsg',await A().set_setting('voice',e.target.value));
 $('sPlay').onclick=async()=>flash('sMsg',await A().preview_voice($('sVoice').value));
 $('sSens').onchange=async e=>{const v=parseFloat(e.target.value);$('sSensT').textContent=v>0?'more eager':v<0?'more strict':'balanced';flash('sMsg',await A().set_setting('wake_sensitivity',v));};
