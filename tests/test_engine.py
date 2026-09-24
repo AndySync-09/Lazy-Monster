@@ -1612,3 +1612,11 @@ def test_kokoro_speaks_without_falling_back(monkeypatch):
     s._windows = lambda text: fell_back.append("windows")
     s.say("Hello there. This is the monster.")
     assert played and fell_back == []
+
+
+def test_local_model_thinking_is_not_spoken(monkeypatch):
+    from lazymonster.agent import ChatClient, LocalClient
+    monkeypatch.setattr(ChatClient, "chat", lambda self, m, t=None: {"choices": [{"message": {
+        "role": "assistant", "content": "<think>The user wants notepad. I should call open_app.</think>\nOpening it."}}]})
+    c = LocalClient("http://localhost:11434/v1", "qwen3.5:9b")
+    assert c.chat([])["choices"][0]["message"]["content"] == "Opening it."

@@ -490,6 +490,20 @@ class LocalClient(ChatClient):
             raise AgentError("local_base_url is not set (run the installer again, or set it in settings)")
         super().__init__(model, api_key_env, base_url, timeout, "", key_required=False)
 
+    _THINK = re.compile(r"<think>.*?</think>\s*|^.*?</think>\s*", re.S)
+
+    def chat(self, messages, tools=None) -> dict:
+        """Thinking models (Qwen3, DeepSeek-R1) may put their reasoning in <think> tags;
+        the monster must never read that aloud."""
+        data = super().chat(messages, tools)
+        try:
+            m = data["choices"][0]["message"]
+            if isinstance(m.get("content"), str) and "think>" in m["content"]:
+                m["content"] = self._THINK.sub("", m["content"]).strip()
+        except (KeyError, IndexError, TypeError):
+            pass
+        return data
+
     def research(self, question: str) -> str:
         from .websearch import research
         return research(self, question)

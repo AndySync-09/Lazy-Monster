@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.3.3
+- Local thinking models (Qwen3, Qwen3.5, DeepSeek-R1 in Ollama) no longer have their `<think>` reasoning spoken aloud or shown.
+
 ## 1.3.2
 - Fix: the window could go full screen (double-clicking its title strip maximised it). It can no longer be maximised, and if anything does, it snaps back to its corner size within a second or two. Tray: "Back to the corner".
 
