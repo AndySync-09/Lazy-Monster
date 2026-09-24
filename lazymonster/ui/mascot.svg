@@ -1,7 +1,7 @@
 <svg id="mascot" xmlns="http://www.w3.org/2000/svg" viewBox="0 -30 400 350" data-state="sleep" role="img" aria-label="Lazy-Monster">
 <defs>
- <linearGradient id="mb" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#9579FF"/><stop offset="1" stop-color="#5B3DE0"/></linearGradient>
- <linearGradient id="mh" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#DDFF6A"/><stop offset="1" stop-color="#9CCB12"/></linearGradient>
+ <linearGradient id="mb" x1="0" y1="0" x2="0" y2="1"><stop offset="0" style="stop-color:var(--b1,#9579FF)"/><stop offset="1" style="stop-color:var(--b2,#5B3DE0)"/></linearGradient>
+ <linearGradient id="mh" x1="0" y1="0" x2="0" y2="1"><stop offset="0" style="stop-color:var(--h1,#DDFF6A)"/><stop offset="1" style="stop-color:var(--h2,#9CCB12)"/></linearGradient>
  <radialGradient id="glow" cx=".5" cy=".6" r=".5"><stop offset="0" stop-color="#C6F432" stop-opacity=".55"/><stop offset="1" stop-color="#C6F432" stop-opacity="0"/></radialGradient>
 </defs>
 <style>
@@ -54,6 +54,31 @@
  @keyframes tilt{0%,100%{transform:rotate(-3deg)}50%{transform:rotate(3deg)}}
  @keyframes hop{0%,100%{transform:translateY(0)}40%{transform:translateY(-16px) scale(1.03,.97)}}
  @keyframes shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-8px)}75%{transform:translateX(8px)}}
+ /* skins */
+ #mascot[data-skin=mint]{--b1:#5EE6C1;--b2:#1FA588;--h1:#FFB3D1;--h2:#FF5FA2;--feet:#1B8F76}
+ #mascot[data-skin=sunset]{--b1:#FFB36B;--b2:#F2545B;--h1:#FFE66D;--h2:#F5C451;--feet:#C9434A}
+ #mascot[data-skin=midnight]{--b1:#4B5BD6;--b2:#1E245C;--h1:#7CF3FF;--h2:#2BC8E0;--feet:#191E4E}
+ #mascot[data-skin=bubblegum]{--b1:#FF9CCB;--b2:#E24C9A;--h1:#DDFF6A;--h2:#9CCB12;--feet:#C23F84}
+ .feet{fill:var(--feet,#5B3DE0)}.tailp{stroke:var(--feet,#5B3DE0)}
+ /* outfits and time-of-day props */
+ .acc{display:none}
+ #mascot[data-outfit=party] .acc-party,#mascot[data-outfit=diwali] .acc-diwali,#mascot[data-outfit=santa] .acc-santa,
+ #mascot[data-outfit=cricket] .acc-cricket,#mascot[data-outfit=shades] .acc-shades{display:inline}
+ #mascot[data-outfit=diwali] .acc-diwali circle{animation:twinkle 1.4s ease-in-out infinite}
+ #mascot[data-outfit=diwali] .acc-diwali circle:nth-child(2n){animation-delay:.7s}
+ #mascot.morning:not([data-state=sleep]) .acc-coffee{display:inline}
+ #mascot.night[data-state=sleep] .acc-mask{display:inline}#mascot.night[data-state=sleep] .closed{opacity:0}
+ .acc-coffee .steam{animation:steam 2s ease-in-out infinite}
+ @keyframes twinkle{50%{opacity:.35}}
+ @keyframes steam{0%{opacity:0;transform:translateY(4px)}50%{opacity:.8}100%{opacity:0;transform:translateY(-10px)}}
+ /* idle moments */
+ #mascot.yawn .mouth{transform:scale(1.6,2.3)}#mascot.yawn .body{animation:stretch 1.8s ease-in-out}
+ #mascot.stretch .body{animation:stretch 1.8s ease-in-out}#mascot.stretch .hornL{transform:rotate(-4deg)}#mascot.stretch .hornR{transform:rotate(4deg)}
+ #mascot.peek .closed{opacity:0}#mascot.peek .open{opacity:1}#mascot.peek .open .lid{transform:scaleY(.55)}
+ @keyframes stretch{0%,100%{transform:scale(1,1)}45%{transform:scale(.96,1.08)}}
+ /* desktop pet: walk */
+ #mascot.walking .body{animation:walk .5s ease-in-out infinite}
+ @keyframes walk{0%,100%{transform:translateY(0) rotate(-2deg)}50%{transform:translateY(-8px) rotate(2deg)}}
  @media (prefers-reduced-motion:reduce){#mascot *{animation:none!important}}
 </style>
 <ellipse class="halo" cx="200" cy="190" rx="190" ry="160" fill="url(#glow)"/>
@@ -61,7 +86,7 @@
 <g class="body">
  <path class="hornL" d="M131,104 L118,52 Q116,44 124,47 L166,90 Z" fill="url(#mh)"/>
  <path class="hornR" d="M269,104 L282,52 Q284,44 276,47 L234,90 Z" fill="url(#mh)"/>
- <path class="tail" d="M312,210 q30,-6 38,22" stroke="#5B3DE0" stroke-width="18" fill="none" stroke-linecap="round"/>
+ <path class="tail tailp" d="M312,210 q30,-6 38,22" stroke="#5B3DE0" stroke-width="18" fill="none" stroke-linecap="round"/>
  <path d="M66,262 C58,168 112,86 200,86 C288,86 342,168 334,262 Q332,284 310,284 L90,284 Q68,284 66,262 Z" fill="url(#mb)"/>
  <path d="M92,150 C110,112 150,96 186,94" stroke="#fff" stroke-opacity=".28" stroke-width="9" fill="none" stroke-linecap="round"/>
  <ellipse cx="200" cy="236" rx="92" ry="40" fill="#B3A2FF" opacity=".35"/>
@@ -81,7 +106,22 @@
  <path class="tongue" d="M206,214 q6,14 14,4" fill="#FF7FA8"/>
  <path class="smile" d="M180,204 q20,20 40,0" stroke="#22105E" stroke-width="7" fill="none" stroke-linecap="round"/>
  <path class="frown" d="M182,216 q18,-14 36,0" stroke="#22105E" stroke-width="7" fill="none" stroke-linecap="round"/>
- <rect x="96" y="262" width="58" height="26" rx="13" fill="#5B3DE0"/><rect x="246" y="262" width="58" height="26" rx="13" fill="#5B3DE0"/>
+ <rect class="feet" x="96" y="262" width="58" height="26" rx="13" fill="#5B3DE0"/><rect class="feet" x="246" y="262" width="58" height="26" rx="13" fill="#5B3DE0"/>
+ <!-- outfits -->
+ <g class="acc acc-party"><path d="M200,20 L168,92 L232,92 Z" fill="#FF5FA2"/><circle cx="200" cy="18" r="10" fill="#F5C451"/>
+  <path d="M178,70 L222,70" stroke="#fff" stroke-width="6" opacity=".7"/></g>
+ <g class="acc acc-santa"><path d="M140,98 Q200,20 262,98 Z" fill="#E3342F"/><rect x="132" y="88" width="136" height="18" rx="9" fill="#fff"/><circle cx="258" cy="46" r="12" fill="#fff"/></g>
+ <g class="acc acc-cricket"><path d="M132,100 Q200,40 268,100 Z" fill="#1E4FD8"/><path d="M200,98 Q262,96 300,110 L268,100 Z" fill="#16389E"/><circle cx="200" cy="56" r="6" fill="#F5C451"/></g>
+ <g class="acc acc-shades"><rect x="128" y="152" width="58" height="36" rx="12" fill="#16142B"/><rect x="214" y="152" width="58" height="36" rx="12" fill="#16142B"/>
+  <path d="M186,168 L214,168" stroke="#16142B" stroke-width="6"/><path d="M136,160 l14,0" stroke="#fff" stroke-width="4" opacity=".6"/></g>
+ <g class="acc acc-diwali"><path d="M96,120 Q200,70 304,120" stroke="#F5C451" stroke-width="5" fill="none"/>
+  <circle cx="118" cy="110" r="10" fill="#FFB36B"/><circle cx="148" cy="98" r="10" fill="#C6F432"/><circle cx="180" cy="90" r="10" fill="#FF5FA2"/>
+  <circle cx="212" cy="89" r="10" fill="#FFE66D"/><circle cx="244" cy="95" r="10" fill="#9DB8FF"/><circle cx="276" cy="106" r="10" fill="#FFB36B"/>
+  <path d="M40,272 q14,-18 28,0 z" fill="#FFB36B"/><path d="M54,254 q-5,-10 0,-16 q5,6 0,16" fill="#FFE66D"/></g>
+ <g class="acc acc-coffee"><rect x="306" y="226" width="40" height="42" rx="8" fill="#F3F1FF"/><path d="M346,236 q14,2 0,20" stroke="#F3F1FF" stroke-width="6" fill="none"/>
+  <rect x="306" y="226" width="40" height="10" rx="4" fill="#7C5CFF"/><path class="steam" d="M318,214 q-6,-10 2,-18 M332,214 q-6,-10 2,-18" stroke="#CFC9F2" stroke-width="4" fill="none" stroke-linecap="round"/></g>
+ <g class="acc acc-mask"><rect x="120" y="150" width="160" height="44" rx="22" fill="#16142B"/><path d="M140,172 q18,10 36,0 M224,172 q18,10 36,0" stroke="#CFC9F2" stroke-width="5" fill="none" stroke-linecap="round"/>
+  <path d="M120,168 L80,156 M280,168 L320,156" stroke="#16142B" stroke-width="7"/></g>
  <g class="doc"><rect x="300" y="228" width="44" height="54" rx="6" fill="#F3F1FF"/><rect x="308" y="240" width="28" height="4" rx="2" fill="#7C5CFF"/>
   <rect x="308" y="250" width="22" height="4" rx="2" fill="#7C5CFF"/><rect x="308" y="260" width="26" height="4" rx="2" fill="#C6F432"/></g>
 </g>

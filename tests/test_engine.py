@@ -1690,3 +1690,49 @@ def test_cpu_question_without_a_brain_gets_a_spoken_answer(monkeypatch):
     eng.say = spoken.append
     eng.on_complete(1, "hey monster check my cpu usage")
     assert spoken == ["CPU is at 12 percent and memory at 94 percent. llama-server uses the most memory. Memory is nearly full."]
+
+
+# ---- 1.5.0: looks, pet, on-device screen reading --------------------------------------------------
+def test_seasonal_outfits():
+    import datetime as dt
+    from lazymonster.looks import seasonal
+    assert seasonal(dt.date(2026, 11, 8)) == "diwali" and seasonal(dt.date(2026, 12, 24)) == "santa"
+    assert seasonal(dt.date(2027, 4, 10)) == "cricket" and seasonal(dt.date(2026, 9, 24)) == ""
+
+
+def _look_rig(monkeypatch, brain_type="ChatClient", allow=False):
+    from lazymonster.config import Config
+    eng, ex, client, said, fb = make_agent([[("look_at_screen", {"question": "what does it say"})],
+                                            [("finish", {"summary": "ok"})]])
+    agent = eng.worker.agent
+    agent.cfg = Config(); agent.cfg.send_screenshots = allow
+    ex.screen = {"title": "Remote Desktop", "app": "mstsc.exe", "text": "", "image": "aGVsbG8="}
+    monkeypatch.setattr(type(agent), "_ocr", staticmethod(lambda img, dev="auto": "TypeError on line 42"))
+    seen = {}
+    Brain = type(brain_type, (), {"vision": lambda self, q, shot: seen.update(shot=dict(shot)) or "It's a TypeError."})
+    agent.client = client
+    client.vision = Brain().vision
+    client.__class__ = type(brain_type, (type(client),), {})
+    agent.run("what does my screen say")
+    return seen["shot"]
+
+
+def test_screen_text_is_read_on_device_and_images_stay_home(monkeypatch):
+    shot = _look_rig(monkeypatch)
+    assert "TypeError on line 42" in shot["text"] and shot["image"] is None       # cloud brain: text only
+    shot = _look_rig(monkeypatch, allow=True)
+    assert shot["image"] == "aGVsbG8="                                          # you allowed screenshots
+    shot = _look_rig(monkeypatch, brain_type="LocalClient")
+    assert shot["image"] == "aGVsbG8="                                          # a local brain keeps it on the PC
+
+
+def test_skin_and_outfit_apply_live(monkeypatch, tmp_path):
+    from lazymonster.settings_ctl import SettingsCtl
+    eng, cfg, ctl = _brain_rig(monkeypatch, tmp_path)
+    eng.brain = ctl
+    c, events = _conv(eng)
+    sent = []
+    bus = type("B", (), {"emit": lambda self, e: sent.append(e)})()
+    s = SettingsCtl(cfg, eng, c, c.speaker, bus, {}, {"lock": None, "verify": None}, lambda: None)
+    s.set("skin", "mint"); s.set("outfit", "party")
+    assert sent[-1] == {"type": "skin", "skin": "mint", "outfit": "party"} and s.get()["skin"] == "mint"

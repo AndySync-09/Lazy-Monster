@@ -59,6 +59,7 @@ def _build(cfg: Config, dry_run: bool, logger=None, feedback=None, clock=time.mo
     def make_agent(client):
         ag = Agent(client, executor, log, say, max_steps=cfg.agent_max_steps, clock=clock)
         ag.journal = True
+        ag.cfg = cfg
         return ag
     if use_agent and cfg.planner != "none":
         try:
@@ -455,6 +456,10 @@ def cmd_ui(a, cfg):
             bus.emit(status_event(cfg, engine.agent_enabled, info, voice))
         refresh_status()
         bus.emit({"type": "look", "style": cfg.look})
+        from .looks import Pet, follow_cursor, skin_event
+        bus.emit(skin_event(cfg))
+        follow_cursor(bus, stop)
+        Pet(bus, cfg, stop).run()
         from .settings_ctl import SettingsCtl
         api._ctl = SettingsCtl(cfg, engine, conv, speaker, bus, det_ref,
                                {"lock": info.get("lock_obj"), "verify": engine.verify}, refresh_status)
@@ -797,6 +802,81 @@ def cmd_brain(a, cfg):
     if a.provider or a.use or a.big:
         tui.dim("The running monster picks this up after: monster service stop ; monster service start "
                 "(or change it live in the window's settings).")
+    return 0
+
+
+VLM_CANDIDATES = [("llmware/Qwen2.5-VL-3B-Instruct-ov-int4-npu", "NPU"), ("llmware/Qwen2.5-VL-3B-Instruct-ov-int4-npu", "GPU"),
+                  ("llmware/Qwen2.5-VL-3B-Instruct-ov-int4-npu", "CPU")]
+
+
+def _test_screen_image():
+    from PIL import Image, ImageDraw, ImageFont
+    img = Image.new("RGB", (1000, 420), "white")
+    d = ImageDraw.Draw(img)
+    try:
+        f = ImageFont.truetype(str(Path(__file__).parent / "ui" / "SpaceGrotesk.ttf"), 30)
+    except Exception:
+        f = ImageFont.load_default()
+    d.rectangle((0, 0, 1000, 50), fill="#E8E8EF")
+    d.text((20, 10), "main.py - cafe - Visual Studio Code", fill="black", font=f)
+    d.text((30, 90), "Traceback (most recent call last):", fill="black", font=f)
+    d.text((30, 140), 'File "main.py", line 42, in render_menu', fill="black", font=f)
+    d.text((30, 190), "TypeError: 'NoneType' object is not subscriptable", fill="#C00000", font=f)
+    d.text((30, 290), "Menu: Filter coffee 60  Masala chai 40  Idli 50", fill="#1E3A8A", font=f)
+    return img
+
+
+def cmd_bench_vision(a, cfg):
+    """Can this PC see its own screen without the cloud? Times on-device OCR and a small vision model."""
+    import numpy as np
+    from . import ocr, tui
+    tui.enable()
+    img = _test_screen_image()
+    tui.title("Reading text in a screenshot (PP-OCRv4 via OpenVINO)")
+    for dev in (["NPU", "GPU", "CPU"] if a.device == "all" else [a.device]):
+        try:
+            r = ocr.bench(img, dev)
+            tui.ok(f"{dev}: ran on {r['device']}, load {r['load_s']} s, read {r['read_ms']} ms, {r['lines']} lines")
+            for k, v in r["errors"].items():
+                tui.dim(f"      {k} refused it: {v}")
+        except Exception as e:
+            tui.warn(f"{dev}: {type(e).__name__}: {str(e)[:120]}")
+    if a.ocr_only:
+        return 0
+    tui.title("Understanding the screenshot (Qwen2.5-VL 3B, INT4, OpenVINO GenAI)")
+    try:
+        import openvino as ov
+        import openvino_genai as ovg
+        from huggingface_hub import snapshot_download
+        from .models import models_dir
+    except Exception as e:
+        tui.warn(f"OpenVINO GenAI isn't available: {e}")
+        return 1
+    tensor = ov.Tensor(np.array(img.convert("RGB"))[None])
+    done = set()
+    for repo, dev in ([(a.model, d) for d in ("NPU", "GPU", "CPU")] if a.model else VLM_CANDIDATES):
+        if a.device != "all" and dev != a.device:
+            continue
+        path = models_dir() / repo.replace("/", "__")
+        if repo not in done:
+            tui.dim(f"  getting {repo} (about 2-3 GB, once)…")
+            snapshot_download(repo, local_dir=str(path))
+            done.add(repo)
+        try:
+            t0 = time.perf_counter()
+            pipe = ovg.VLMPipeline(str(path), dev, CACHE_DIR=str(models_dir() / "ov_cache"))
+            load = time.perf_counter() - t0
+            t1 = time.perf_counter()
+            out = pipe.generate("What error is shown, and on which line? One sentence.", image=tensor, max_new_tokens=60)
+            secs = time.perf_counter() - t1
+            text = str(out).strip()
+            words = len(text.split())
+            tui.ok(f"{dev}: load {load:.1f} s, answer in {secs:.1f} s (~{words / max(secs, 0.01):.1f} words/s)")
+            tui.dim(f"      \u201c{text[:160]}\u201d")
+            del pipe
+        except Exception as e:
+            tui.warn(f"{dev}: {type(e).__name__}: {str(e).splitlines()[0][:140]}")
+    tui.dim("Paste this output back so we can decide where on-device vision should run.")
     return 0
 
 
@@ -1264,6 +1344,10 @@ def main(argv=None):
     vl = sub.add_parser("voice-lock", help="turn the voice lock on or off")
     vl.add_argument("state", choices=["on", "off"])
     sub.add_parser("update", help="update to the newest version (keeps your settings and models)")
+    bv = sub.add_parser("bench-vision", help="time on-device screen reading (OCR) and a small vision model on NPU/GPU/CPU")
+    bv.add_argument("--device", default="all", choices=["all", "NPU", "GPU", "CPU"])
+    bv.add_argument("--model", default="", help="a Hugging Face OpenVINO VLM repo to try instead")
+    bv.add_argument("--ocr-only", action="store_true")
     br = sub.add_parser("brain", help="see or change the brain and model")
     br.add_argument("--list", action="store_true", help="list models your key or server can use")
     br.add_argument("--provider", help="openai, claude or local")
@@ -1294,7 +1378,7 @@ def main(argv=None):
     fn = {"run": cmd_run, "text": cmd_text, "bench-text": cmd_bench_text, "record": cmd_record,
           "bench-audio": cmd_bench_audio, "apps": cmd_apps, "do": cmd_do, "npu": cmd_npu, "doctor": cmd_doctor, "say": cmd_say, "ui": cmd_ui, "models": cmd_models,
           "wake-train": cmd_wake_train, "wake-test": cmd_wake_test, "service": cmd_service,
-          "voice-enroll": cmd_voice_enroll, "voice-lock": cmd_voice_lock, "voice-reset": cmd_voice_reset, "voices": cmd_voices, "voice-test": cmd_voice_test, "update": cmd_update, "permissions": cmd_permissions, "brain": cmd_brain}[a.cmd]
+          "voice-enroll": cmd_voice_enroll, "voice-lock": cmd_voice_lock, "voice-reset": cmd_voice_reset, "voices": cmd_voices, "voice-test": cmd_voice_test, "update": cmd_update, "permissions": cmd_permissions, "brain": cmd_brain, "bench-vision": cmd_bench_vision}[a.cmd]
     sys.exit(fn(a, cfg) or 0)
 
 

@@ -53,6 +53,11 @@ class Config:
     acks: bool = True                # say "On it" when a task starts
     greet: bool = True               # "Hi Andy, how can I help?" after a bare "Hey Monster"
     user_name: str = ""              # empty = first name from your Windows account
+    skin: str = "classic"            # classic | mint | sunset | midnight | bubblegum
+    outfit: str = "auto"             # auto (seasonal) | "" | party | diwali | santa | cricket | shades
+    pet_mode: bool = False           # while napping, walk along the taskbar
+    send_screenshots: bool = False   # let a cloud brain see screenshots (off: text + on-device OCR only)
+    ocr_device: str = "auto"         # auto (NPU, then GPU, then CPU) | NPU | GPU | CPU
     look: str = "mascot"             # mascot (animated character) | particles (the classic particle monster)
     window_x: int = -1               # where you dragged the window (-1 = bottom-left corner)
     window_y: int = -1

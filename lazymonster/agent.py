@@ -227,12 +227,32 @@ class Agent:
             return f"ERROR: couldn't look at the screen ({type(e).__name__}: {e})"
         if shot.get("blocked"):
             return "That window looks private (passwords, keys or banking), so I didn't look at it."
-        self.log(event="looked", title=shot.get("title", "")[:80], image=bool(shot.get("image")))
         brain = client if hasattr(client, "vision") else self.client
+        cfg = getattr(self, "cfg", None)
+        local_brain = type(brain).__name__ == "LocalClient"
+        if shot.get("image") and len(shot.get("text") or "") < 300:
+            ocr_text = self._ocr(shot["image"], getattr(cfg, "ocr_device", "auto"))
+            if ocr_text:                                        # read on this PC (NPU) from the picture
+                shot["text"] = ((shot.get("text") or "") + "\n[read from the screen image]\n" + ocr_text).strip()
+        if shot.get("image") and not local_brain and not getattr(cfg, "send_screenshots", False):
+            shot["image"] = None                                # cloud brain: text only unless you allowed images
+        self.log(event="looked", title=shot.get("title", "")[:80], image=bool(shot.get("image")))
         try:
             return brain.vision(question, shot)
         except Exception as e:
             return f"ERROR: couldn't read it ({type(e).__name__}: {str(e)[:120]})"
+
+    @staticmethod
+    def _ocr(image_b64: str, device: str = "auto") -> str:
+        try:
+            import base64
+            import io
+            from PIL import Image
+            from . import ocr
+            o = ocr.get(device)
+            return o.read_text(Image.open(io.BytesIO(base64.b64decode(image_b64)))) if o else ""
+        except Exception:
+            return ""
 
     def suggest(self, about: str) -> list:
         """Up to three things the monster could do next, for a reminder that just went off."""

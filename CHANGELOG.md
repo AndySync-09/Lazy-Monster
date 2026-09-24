@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.5.0: alive
+- **Mascot → monster.** When a task starts, the mascot breaks apart into particles that become the particle monster: the decision tree, the typing page, falling branches. When it's done, the particles fly back together into the mascot, which hops.
+- **Eyes that follow your pointer** (anywhere on screen, on Windows) while it listens or talks, and **idle moments** while it naps: a yawn, a stretch, a one-eyed peek at you. A coffee cup in the morning, a sleep mask late at night.
+- **Skins:** Classic violet, Mint, Sunset, Midnight, Bubblegum. **Outfits:** seasonal by default (Diwali lights from 20 Oct to 15 Nov, a winter hat over Christmas, a cricket cap in IPL season), or a party hat, sunglasses, or none. Settings > Look.
+- **Desktop pet mode** (Settings > Look, experimental): while it naps as the small orb, it walks along the top of the taskbar, turns at the edges and stops for naps. On Windows the orb's background is made see-through with a colour key; if your system draws it as a dark box instead, tell us.
+- **Reading the screen on this PC.** When a window's text can't be read directly (a remote desktop, an image, a PDF shown as a picture, a game), "what's on my screen" reads the text from the screenshot with PP-OCRv4, compiled through OpenVINO at fixed shapes so it can run on the NPU (falling back to the GPU, then the CPU). The same text as ONNX Runtime, measured.
+- **Screenshots stay home by default.** Cloud brains now get the window's text and the text read on your PC, not the image, unless you turn on Settings > Privacy > "Let cloud brains see screenshots". A local brain (Ollama, llama.cpp) always gets the image, since it never leaves the PC.
+- **`monster bench-vision`**: times on-device OCR on NPU/GPU/CPU and a small vision model (Qwen2.5-VL 3B, INT4, an NPU-targeted OpenVINO export) on each, with its answer, so we can decide where full on-device vision should run.
+- The status bar keeps its labels in compact mode.
+
 ## 1.4.0: the monster sees
 - **It no longer falls asleep mid-task.** "On it" finished, the monster checked a handful of flags, found none set at that instant, and went to sleep while the brain was still working. A running task is now an explicit state that nothing else overrides; slow tasks show "still working… 12 s".
 - **The animated mascot.** The character from the logo, drawn in SVG and animated with CSS (no particles): it breathes and floats Zs when asleep, opens its eyes and tilts its head while listening (with a glow that follows your voice), looks up with thinking dots while it decides (with the options it's weighing shown as pills), sticks its tongue out with a page while working, talks while speaking, hops when done and frowns on an error. It's the default look; "Particles" is still in settings. The README and website use a sleeping version that peeks now and then.

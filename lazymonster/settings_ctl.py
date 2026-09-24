@@ -30,7 +30,8 @@ class SettingsCtl:
                 "voice": c.kokoro_voice, "voices": VOICES, "wake_sensitivity": c.wake_sensitivity,
                 "voice_lock": c.voice_lock and self.engine.verify is not None, "voice_lock_ready": self.lock_ref.get("lock") is not None,
                 "conversation_mode": self.engine.conversation_mode, "barge_in": self.conv.barge_in,
-                "push_to_talk": c.push_to_talk, "version": __version__}
+                "push_to_talk": c.push_to_talk, "version": __version__,
+                "skin": c.skin, "outfit": c.outfit, "pet_mode": c.pet_mode, "send_screenshots": c.send_screenshots}
 
     def models(self, provider: str):
         return list_models(self.cfg, provider)
@@ -89,6 +90,21 @@ class SettingsCtl:
         elif key == "side":
             self.bus.move_to(str(value))
             msg = "Moved."
+        elif key in ("skin", "outfit"):
+            from .looks import skin_event
+            setattr(c, key, str(value))
+            save_setting(key, str(value))
+            if self.bus is not None:
+                self.bus.emit(skin_event(c))
+            msg = "Looking good."
+        elif key == "pet_mode":
+            c.pet_mode = bool(value)
+            save_setting("pet_mode", c.pet_mode)
+            msg = "It'll wander along the taskbar while it naps." if value else "Pet mode off."
+        elif key == "send_screenshots":
+            c.send_screenshots = bool(value)
+            save_setting("send_screenshots", c.send_screenshots)
+            msg = "Cloud brains may see screenshots when you ask." if value else "Screenshots stay on this PC."
         elif key == "look":
             c.look = "particles" if value == "particles" else "mascot"
             save_setting("look", c.look)
