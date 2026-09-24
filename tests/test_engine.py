@@ -1736,3 +1736,26 @@ def test_skin_and_outfit_apply_live(monkeypatch, tmp_path):
     s = SettingsCtl(cfg, eng, c, c.speaker, bus, {}, {"lock": None, "verify": None}, lambda: None)
     s.set("skin", "mint"); s.set("outfit", "party")
     assert sent[-1] == {"type": "skin", "skin": "mint", "outfit": "party"} and s.get()["skin"] == "mint"
+
+
+def test_watchdog_restarts_after_a_crash_and_stops_when_you_quit(tmp_path, monkeypatch):
+    monkeypatch.setenv("APPDATA", str(tmp_path))
+    from lazymonster import watchdog, service
+    monkeypatch.setattr(service, "single_instance", lambda kind="background": True)
+    codes, envs = [3221225477, 0], []
+    monkeypatch.setattr(watchdog.subprocess, "call", lambda cmd, env, creationflags: envs.append(env) or codes.pop(0))
+    monkeypatch.setattr(watchdog.time, "sleep", lambda s: None)
+    assert watchdog.supervise(["ui", "--background"]) == 0
+    assert len(envs) == 2 and "LM_RESTARTED" in envs[1] and envs[1]["LM_SUPERVISED"] == "1"
+    report = open(envs[1]["LM_RESTARTED"]).read()
+    assert "0xc0000005" in report
+
+
+def test_watchdog_gives_up_after_repeated_crashes(tmp_path, monkeypatch):
+    monkeypatch.setenv("APPDATA", str(tmp_path))
+    from lazymonster import watchdog, service
+    monkeypatch.setattr(service, "single_instance", lambda kind="background": True)
+    calls = []
+    monkeypatch.setattr(watchdog.subprocess, "call", lambda cmd, env, creationflags: calls.append(1) or 1)
+    monkeypatch.setattr(watchdog.time, "sleep", lambda s: None)
+    assert watchdog.supervise(["ui", "--background"]) == 1 and len(calls) == watchdog.MAX_RESTARTS + 1

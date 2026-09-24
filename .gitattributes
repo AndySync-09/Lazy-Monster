@@ -1,0 +1,7 @@
+# Keep line endings as they are in the repo (LF); stops Git's "LF will be replaced by CRLF" warnings on Windows.
+* text=auto eol=lf
+*.png binary
+*.ico binary
+*.ttf binary
+*.onnx binary
+*.npz binary

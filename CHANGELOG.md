@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.5.1
+- **Watchdog.** The sign-in entry now starts a small supervisor that runs the monster; if the monster dies without you quitting it, the supervisor saves a crash report (exit code, how long it ran, the last 120 log lines, any native crash trace) and starts it again within seconds, up to 5 times in 10 minutes. The monster tells you it restarted and where the report is. `monster crashes` shows the latest one. Quitting from the tray or `monster service stop` is never treated as a crash.
+- `monster bench-vision`: the model download retries and resumes instead of stopping with a traceback when the connection is reset, and `--mirror` downloads through hf-mirror.com.
+- `.gitattributes` keeps line endings as LF, which silences Git's "LF will be replaced by CRLF" warnings on Windows.
+
 ## 1.5.0: alive
 - **Mascot → monster.** When a task starts, the mascot breaks apart into particles that become the particle monster: the decision tree, the typing page, falling branches. When it's done, the particles fly back together into the mascot, which hops.
 - **Eyes that follow your pointer** (anywhere on screen, on Windows) while it listens or talks, and **idle moments** while it naps: a yawn, a stretch, a one-eyed peek at you. A coffee cup in the morning, a sleep mask late at night.

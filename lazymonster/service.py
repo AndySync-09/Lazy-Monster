@@ -104,6 +104,9 @@ def start() -> None:
 
 
 def stop() -> int:
+    from .config import config_dir
+    config_dir().mkdir(parents=True, exist_ok=True)
+    (config_dir() / "stop.flag").touch()                 # tell the watchdog this one is on purpose
     tops = running()
     for p in _matches():                 # the whole chain, children included
         try:
@@ -116,14 +119,14 @@ def stop() -> int:
 _MUTEX = None
 
 
-def single_instance() -> bool:
-    """True if this is the only background monster for this user."""
+def single_instance(kind: str = "background") -> bool:
+    """True if this is the only background monster (or its supervisor) for this user."""
     global _MUTEX
     if os.name != "nt":
         import fcntl
         from .config import config_dir
         config_dir().mkdir(parents=True, exist_ok=True)
-        _MUTEX = open(config_dir() / "background.lock", "w")
+        _MUTEX = open(config_dir() / f"{kind}.lock", "w")
         try:
             fcntl.flock(_MUTEX, fcntl.LOCK_EX | fcntl.LOCK_NB)
             return True
@@ -132,7 +135,7 @@ def single_instance() -> bool:
     import ctypes
     k32 = ctypes.WinDLL("kernel32", use_last_error=True)       # read the error the right way (0.8 did not)
     k32.CreateMutexW.restype = ctypes.c_void_p
-    _MUTEX = k32.CreateMutexW(None, False, "Local\\LazyMonsterBackground")
+    _MUTEX = k32.CreateMutexW(None, False, "Local\\LazyMonster" + kind.capitalize())
     return ctypes.get_last_error() != 183                        # ERROR_ALREADY_EXISTS
 
 

@@ -408,6 +408,13 @@ def cmd_ui(a, cfg):
     import threading
     background = getattr(a, "background", False)
     _app_identity()
+    if background and not os.environ.get("LM_SUPERVISED") and not getattr(a, "no_watchdog", False):
+        from .service import running
+        from .watchdog import supervise
+        if running() and getattr(a, "show", False):   # Start menu: bring up the monster that's already running
+            (config_dir() / SHOW_FLAG).touch()
+            return 0
+        return supervise(["ui", "--background"] + (["--show"] if getattr(a, "show", False) else []))
     if background:
         from .service import single_instance
         if not single_instance():
@@ -481,6 +488,8 @@ def cmd_ui(a, cfg):
         Scheduler(lambda r, late: threading.Thread(target=conv.remind, args=(r, late), daemon=True).start()).run(stop)
         conv.set("sleeping", 'say "Hey Monster" or type below')
         threading.Thread(target=_update_check, args=(bus,), daemon=True).start()
+        if os.environ.get("LM_RESTARTED"):
+            bus.emit({"type": "note", "text": "I restarted after a crash. Report: " + os.environ["LM_RESTARTED"]})
 
     # "Hey Monster, sleep" shrinks to a small sleeping orb and keeps listening, in every UI mode.
     # "Hey Monster", the hotkey or a click on the orb brings the full window back. Quit is in the tray.
@@ -844,6 +853,8 @@ def cmd_bench_vision(a, cfg):
     if a.ocr_only:
         return 0
     tui.title("Understanding the screenshot (Qwen2.5-VL 3B, INT4, OpenVINO GenAI)")
+    if a.mirror:
+        os.environ["HF_ENDPOINT"] = "https://hf-mirror.com"
     try:
         import openvino as ov
         import openvino_genai as ovg
@@ -859,8 +870,20 @@ def cmd_bench_vision(a, cfg):
             continue
         path = models_dir() / repo.replace("/", "__")
         if repo not in done:
-            tui.dim(f"  getting {repo} (about 2-3 GB, once)…")
-            snapshot_download(repo, local_dir=str(path))
+            tui.dim(f"  getting {repo} (about 2-3 GB, once; resumes if interrupted)…")
+            got = False
+            for attempt in range(1, 5):
+                try:
+                    snapshot_download(repo, local_dir=str(path), max_workers=2)
+                    got = True
+                    break
+                except Exception as e:
+                    tui.warn(f"  download attempt {attempt} failed ({type(e).__name__}: {str(e).splitlines()[0][:90]})")
+                    time.sleep(3 * attempt)
+            if not got:
+                tui.warn("  Couldn't reach Hugging Face (the connection was reset). Try again, or use a mirror: "
+                         "monster bench-vision --mirror")
+                return 1
             done.add(repo)
         try:
             t0 = time.perf_counter()
@@ -877,6 +900,18 @@ def cmd_bench_vision(a, cfg):
         except Exception as e:
             tui.warn(f"{dev}: {type(e).__name__}: {str(e).splitlines()[0][:140]}")
     tui.dim("Paste this output back so we can decide where on-device vision should run.")
+    return 0
+
+
+def cmd_crashes(a, cfg):
+    """The latest crash report the watchdog saved."""
+    from .watchdog import crash_dir
+    reports = sorted(crash_dir().glob("crash-*.txt"))
+    if not reports:
+        print("  No crashes recorded.")
+        return 0
+    print(f"  {len(reports)} crash report(s); latest: {reports[-1]}\n")
+    print("\n".join(reports[-1].read_text(encoding="utf-8").splitlines()[:6 + a.lines]))
     return 0
 
 
@@ -1331,6 +1366,7 @@ def main(argv=None):
     u.add_argument("--device", help="input device index or name")
     u.add_argument("--background", action="store_true", help="start hidden; show on Hey Monster (used at sign-in)")
     u.add_argument("--show", action="store_true", help="show the window (starts the monster if it isn't running)")
+    u.add_argument("--no-watchdog", action="store_true", help="don't restart it automatically after a crash")
     sv = sub.add_parser("service", help="run Lazy-Monster in the background from sign-in")
     sv.add_argument("action", choices=["install", "uninstall", "start", "stop", "status"])
     wt = sub.add_parser("wake-train", help="train your personal Hey Monster wake word (NPU)")
@@ -1344,10 +1380,13 @@ def main(argv=None):
     vl = sub.add_parser("voice-lock", help="turn the voice lock on or off")
     vl.add_argument("state", choices=["on", "off"])
     sub.add_parser("update", help="update to the newest version (keeps your settings and models)")
+    cr = sub.add_parser("crashes", help="show the latest crash report")
+    cr.add_argument("--lines", type=int, default=60)
     bv = sub.add_parser("bench-vision", help="time on-device screen reading (OCR) and a small vision model on NPU/GPU/CPU")
     bv.add_argument("--device", default="all", choices=["all", "NPU", "GPU", "CPU"])
     bv.add_argument("--model", default="", help="a Hugging Face OpenVINO VLM repo to try instead")
     bv.add_argument("--ocr-only", action="store_true")
+    bv.add_argument("--mirror", action="store_true", help="download through hf-mirror.com if huggingface.co keeps resetting")
     br = sub.add_parser("brain", help="see or change the brain and model")
     br.add_argument("--list", action="store_true", help="list models your key or server can use")
     br.add_argument("--provider", help="openai, claude or local")
@@ -1378,7 +1417,7 @@ def main(argv=None):
     fn = {"run": cmd_run, "text": cmd_text, "bench-text": cmd_bench_text, "record": cmd_record,
           "bench-audio": cmd_bench_audio, "apps": cmd_apps, "do": cmd_do, "npu": cmd_npu, "doctor": cmd_doctor, "say": cmd_say, "ui": cmd_ui, "models": cmd_models,
           "wake-train": cmd_wake_train, "wake-test": cmd_wake_test, "service": cmd_service,
-          "voice-enroll": cmd_voice_enroll, "voice-lock": cmd_voice_lock, "voice-reset": cmd_voice_reset, "voices": cmd_voices, "voice-test": cmd_voice_test, "update": cmd_update, "permissions": cmd_permissions, "brain": cmd_brain, "bench-vision": cmd_bench_vision}[a.cmd]
+          "voice-enroll": cmd_voice_enroll, "voice-lock": cmd_voice_lock, "voice-reset": cmd_voice_reset, "voices": cmd_voices, "voice-test": cmd_voice_test, "update": cmd_update, "permissions": cmd_permissions, "brain": cmd_brain, "bench-vision": cmd_bench_vision, "crashes": cmd_crashes}[a.cmd]
     sys.exit(fn(a, cfg) or 0)
 
 
