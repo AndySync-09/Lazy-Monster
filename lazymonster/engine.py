@@ -47,6 +47,8 @@ class Engine:
         self.refine, self.refine_async = refine, refine_async   # pass-2 recognizer (Whisper on NPU)
         self._typed_id = 0
         self.exit_message = "Going to sleep. Run monster again to wake me."
+        self.on_move = None                          # UI: "move to the right"
+        self._brainless_told = -1e9
         self.followup_only_on_question = False        # cli: True
         self.verify: Optional[Callable[[float], bool]] = None   # voice lock: is this audio (since t) you?
         self.jev = None                                         # optional decider: "was that meant for me?"
@@ -246,6 +248,13 @@ class Engine:
                 self.armed_until = 0.0
                 self.log(event="not_for_me", text=cmd, p=round(p, 2))
                 return
+        if not self.agent_enabled and len(cmd.split()) >= 2:
+            # no brain: say so once in a while, instead of "didn't catch that" after every sentence
+            if self.clock() - self._brainless_told > 600:
+                self._brainless_told = self.clock()
+                self.say("I can only do quick commands right now. Give me a brain by running the installer again.")
+            self.log(event="needs_brain", text=cmd)
+            return
         # A one-word turn is noise, unless we are mid-conversation ("snake", "the second one").
         if not self.agent_enabled or not cmd or (len(cmd.split()) < 2 and not self.in_session()):
             self.feedback("unknown")
@@ -306,6 +315,11 @@ class Engine:
         if intent.name == "exit_app":
             self.worker.cancel()
             self.go_to_sleep(cmd)
+            return
+        if intent.name == "move_monster":
+            self.log(event="move", side=intent.args.get("side"))
+            if self.on_move:
+                self.on_move(intent.args.get("side", "left"))
             return
         if intent.name in ("confirm_yes", "confirm_no"):
             if self.pending and now < self.pending_until:

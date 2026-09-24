@@ -114,10 +114,13 @@ def test_confirmation_expires_and_no_cancels():
     assert ex.calls == []
 
 
-def test_unknown_without_planner():
-    eng, ex, _, fb, _ = make()
+def test_no_brain_says_so_once():
+    eng, ex, _, fb, logs = make()
+    spoken = []
+    eng.say = spoken.append
     eng.on_complete(1, "hey monster open the pod bay doors")
-    assert ex.calls == [] and fb[-1] == "unknown"
+    eng.on_complete(2, "hey monster write me a poem")
+    assert ex.calls == [] and len(spoken) == 1 and "brain" in spoken[0]
 
 
 # ---- lane 2: agent loop -----------------------------------------------------------
@@ -858,18 +861,22 @@ def test_close_all_discard():
 def test_journal_recap_and_context(tmp_path, monkeypatch):
     monkeypatch.setenv("APPDATA", str(tmp_path))
     from lazymonster import journal
-    journal.add("Hey Monster, can you make a snake game in VS Code", "Made it", ["C:\\\\x\\\\main.py"])
-    journal.add("write a haiku about Bangalore traffic in Notepad", "Done", [])
+    journal.add("Hey Monster, can you make a snake game in VS Code", "Done. I built a snake game in VS Code. Want to run it?",
+                ["C:\\x\\main.py"], tools=["code_write_file"])
+    journal.add("write a haiku about Bangalore traffic in Notepad", "Wrote a haiku about Bangalore traffic in Notepad.", [],
+                tools=["write_in_app"])
+    journal.add("to thirty percent and play some music", "Set it.", [], tools=["set_volume", "media_play_pause"])
+    journal.add("Yes, please do that: Want me to save it?", "Saved.", [], tools=["word_save"])
     r = journal.recap()
-    assert "snake game" in r and "haiku about Bangalore" in r
+    assert r == "Last time, wrote a haiku about Bangalore traffic in Notepad. Before that, I built a snake game in VS Code."
+    assert "thirty percent" not in r and "please do that" not in r
     assert "main.py" in journal.context()
-    assert journal.files_in(["wrote 111 lines to C:\\\\a\\\\b\\\\main.py; verified"]) == ["C:\\\\a\\\\b\\\\main.py"]
-
+    assert journal.files_in(["wrote 111 lines to C:\\a\\b\\main.py; verified"]) == ["C:\\a\\b\\main.py"]
 
 def test_first_greeting_is_a_recap_and_seeds_the_conversation(tmp_path, monkeypatch):
     monkeypatch.setenv("APPDATA", str(tmp_path))
     from lazymonster import journal
-    journal.add("make a snake game in VS Code", "Made it", [])
+    journal.add("make a snake game in VS Code", "Made a snake game in VS Code.", [], tools=["code_write_file"])
     eng, ex, client, said, fb = make_agent([])
     c, events = _conv(eng, user_name="Andy")
     c.recap = True
@@ -1173,6 +1180,8 @@ def test_build_client_per_provider(monkeypatch):
     cfg = Config()
     cfg.planner = "openai"; assert type(build_client(cfg)) is ChatClient
     cfg.planner = "anthropic"; c = build_client(cfg); assert type(c) is ClaudeClient and c.model == cfg.anthropic_model
+    assert build_client(cfg, escalation=True) is None                  # "go big" is opt-in
+    cfg.go_big = True
     assert build_client(cfg, escalation=True).model == cfg.anthropic_escalation_model
     cfg.planner = "jev"
     with pytest.raises(AgentError):
@@ -1324,3 +1333,70 @@ def test_running_counts_one_monster_per_launcher_chain(monkeypatch):
     chain = [P(10, 1), P(11, 10), P(12, 11)]
     monkeypatch.setattr(service, "_matches", lambda: chain)
     assert [p.pid for p in service.running()] == [10]
+
+
+# ---- 1.1.0: local brains, web research without a cloud, window and status ---------------------
+def test_parse_duckduckgo_results():
+    from lazymonster.websearch import parse_ddg
+    page = ('<a rel="nofollow" class="result__a" href="//duckduckgo.com/l/?uddg=https%3A%2F%2Fai.meta.com%2Fblog%2F&amp;rut=x">'
+            'Meta <b>AI</b> blog</a><a class="result__a" href="https://example.org/news">Example news</a>')
+    assert parse_ddg(page) == [("Meta AI blog", "https://ai.meta.com/blog/"), ("Example news", "https://example.org/news")]
+
+
+def test_page_text_skips_scripts_and_nav():
+    from lazymonster.websearch import page_text
+    assert page_text("<nav>Menu</nav><script>x=1</script><p>Llama 5 was released in <b>May</b>.</p>") == "Llama 5 was released in May ."
+
+
+def test_local_research_uses_search_and_cites(monkeypatch):
+    from lazymonster import websearch
+    monkeypatch.setattr(websearch, "search", lambda q, limit=6: [("A", "https://a.example"), ("B", "https://b.example")])
+    monkeypatch.setattr(websearch, "fetch", lambda url, limit=3000: "Fact about " + url + ". " * 120)
+    class Brain:
+        def chat(self, messages, tools=None):
+            assert "[1]" in messages[1]["content"] and "[2]" in messages[1]["content"]
+            return {"choices": [{"message": {"content": "Answer [1]."}}]}
+    out = websearch.research(Brain(), "what happened?")
+    assert out.startswith("Answer [1].") and "https://a.example" in out
+
+
+def test_local_brain_needs_no_key_and_goes_big_to_the_cloud(monkeypatch):
+    from lazymonster.agent import ChatClient, LocalClient, build_client
+    from lazymonster.config import Config
+    monkeypatch.delenv("LOCAL_LLM_API_KEY", raising=False)
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    cfg = Config(); cfg.planner, cfg.local_base_url, cfg.local_model = "local", "http://localhost:11434/v1", "qwen3:8b"
+    c = build_client(cfg)
+    assert type(c) is LocalClient and c.model == "qwen3:8b" and hasattr(c, "research")
+    cfg.go_big = True
+    monkeypatch.setenv("OPENAI_API_KEY", "k")
+    big = build_client(cfg, escalation=True)
+    assert type(big) is ChatClient and big.model == cfg.escalation_model
+    monkeypatch.delenv("OPENAI_API_KEY")
+    assert build_client(cfg, escalation=True) is None
+
+
+def test_window_starts_bottom_left_and_keeps_your_spot():
+    from lazymonster.ui.app import corner_geom
+    g = corner_geom(1920, 1080)
+    assert g["full"][0] == 16 and g["full"][1] == 1080 - 760 - 56 and g["orb"][0] == 16
+    g = corner_geom(1920, 1080, saved=(1400, 200))
+    assert g["full"][:2] == (1400, 200) and g["orb"][0] > 1000              # orb follows to the right side
+    assert corner_geom(1920, 1080, saved=(5000, 200))["full"][0] == 16      # off-screen spot is ignored
+
+
+def test_status_event_shape():
+    from lazymonster.cli import status_event
+    from lazymonster.config import Config
+    cfg = Config(); cfg.planner, cfg.go_big = "anthropic", True
+    ev = status_event(cfg, True, {"wake": "wake word on NPU", "stt": "Whisper on GPU", "lock": "voice lock on"}, "Kokoro")
+    assert ev["wake_dev"] == "NPU" and ev["brain"].startswith("Claude") and ev["big"] and ev["lock"]
+    assert status_event(cfg, False, {}, "Kokoro")["brain"] == ""
+
+
+def test_voice_move_command():
+    moved = []
+    eng, ex, *_ = make()
+    eng.on_move = moved.append
+    eng.on_complete(1, "hey monster move to the right")
+    assert moved == ["right"] and ex.calls == []

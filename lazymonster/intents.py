@@ -36,6 +36,7 @@ SCHEMA: Dict[str, Dict[str, Any]] = {
     "type_text":      {"slots": {"text": TEXT}, "confirm": False, "early": False, "desc": "Type text into the focused window (not terminals or VS Code; use code_write_file for code)"},
     "sleep":          {"slots": {}, "confirm": True, "early": True, "desc": "Sleep the PC"},
     "exit_app":       {"slots": {}, "confirm": False, "early": True, "internal": True},
+    "move_monster":   {"slots": {"side": (str, 4, 6)}, "confirm": False, "early": True, "internal": True},
     "shutdown":       {"slots": {}, "confirm": True, "early": True, "desc": "Shut down the PC"},
     "restart":        {"slots": {}, "confirm": True, "early": True, "desc": "Restart the PC"},
     "confirm_yes":    {"slots": {}, "confirm": False, "early": True, "internal": True},

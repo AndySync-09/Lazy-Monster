@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.1.0: your brain, your corner
+- **No brain, no go.** The installer finds the keys you already have and says "Monster Brain: OpenAI. Keep it, switch brain, or make the monster go big?" With no key it asks until one works (or you quit). "Go big" (hard tasks on GPT-6 Astra or Claude Sonnet 5) is now opt-in: `go_big = true`.
+- **Local brains.** Ollama, llama.cpp, vLLM, LM Studio or any OpenAI-style endpoint (`planner = "local"`). The installer finds servers on the usual ports, lists their models, and tests that the model can call tools before accepting it, with the exact flag to fix it if not. A local brain can still go big on a cloud model if you add a key.
+- **Web research with any brain.** Local brains search DuckDuckGo (no key) or Brave Search (`BRAVE_API_KEY`), read the top pages and summarise them with numbered sources.
+- **Retrain your voice from scratch.** The installer offers "keep it or start fresh"; `monster voice-reset --train` and the tray's "Retrain my voice…" do the same any time. Wake-word training now also records 20 seconds of your room (typing, fan), which is what false wakes are made of.
+- **A new top of the window.** An animated status bar replaces the text chips: ears (pulse when listening), the brain (provider colour, a spark when it goes big), the voice lock, and live chip meters; a glowing line under the title shows the mood (violet asleep, lime listening, pink speaking). Details on hover.
+- **Bottom-left, and it stays where you put it.** Starts in the bottom-left corner, remembers where you drag it, the sleeping orb sits on the same side, and "Hey Monster, move to the right" works.
+- Fixes: the welcome-back recap only lists real work, in the monster's own words ("Last time, I built a snake game in VS Code"), never "Yes, please do that…" or "to thirty percent". Without a brain it says once that it needs one, instead of a column of "didn't catch that".
+
 ## 1.0.4
 - **No more greetings out of nowhere.** The wake word now gets a second opinion before the monster wakes: Whisper re-hears the last two seconds (without its vocabulary hint, so it can't imagine the word) and must hear "monster", and with the voice lock on it must sound like you. A false wake stays completely silent (logged as `wake ignored`).
 - The detector itself is stricter: your trained threshold instead of a cap at 0.85, and three hits in a row instead of two. Tune with `wake_sensitivity`.

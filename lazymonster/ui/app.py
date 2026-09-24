@@ -4,6 +4,7 @@ cancel, sleep). The page never executes anything itself."""
 import base64
 import json
 import threading
+import time
 from pathlib import Path
 
 
@@ -16,6 +17,38 @@ class UIBus:
         self.agent = None
         self.geom = None                        # {"full": (x, y, w, h), "orb": (x, y, w, h)}
         self.orb = False
+
+    def on_moved(self, x, y):
+        """Dragged: remember it (debounced), and keep the orb on the same side."""
+        if self.orb or not self.geom:
+            return
+        sw, sh = self.geom.get("screen", (1920, 1080))
+        self.geom = corner_geom(sw, sh, saved=(x, y))
+        t = getattr(self, "_save_t", None)
+        if t:
+            t.cancel()
+
+        def save():
+            from ..config import save_setting
+            save_setting("window_x", int(x)); save_setting("window_y", int(y))
+        self._save_t = threading.Timer(1.0, save)
+        self._save_t.daemon = True
+        self._save_t.start()
+
+    def move_to(self, side: str):
+        """"Hey Monster, move to the right"."""
+        if not self.geom or self.window is None:
+            return
+        sw, sh = self.geom.get("screen", (1920, 1080))
+        self.geom = corner_geom(sw, sh, side)
+        x, y = self.geom["orb" if self.orb else "full"][:2]
+        try:
+            self.window.move(x, y)
+        except Exception:
+            pass
+        from ..config import save_setting
+        fx, fy = self.geom["full"][:2]
+        save_setting("window_x", fx); save_setting("window_y", fy)
 
     def set_orb(self, on: bool):
         """Shrink to a small sleeping orb at the screen edge, or back to the full window."""
@@ -69,7 +102,10 @@ class UIBus:
             if kind == "ok" and s:
                 self.emit({"type": "suggest", "text": s})
         elif kind == "unknown":
-            self.emit({"type": "note", "text": "didn't catch that"})
+            now = time.monotonic()
+            if now - getattr(self, "_last_unknown", -1e9) > 30:      # once, not a column of them
+                self._last_unknown = now
+                self.emit({"type": "note", "text": "didn't catch that"})
 
     def log(self, line: str):
         ev = json.loads(line)
@@ -140,20 +176,41 @@ def page_html() -> str:
     return (here / "index.html").read_text(encoding="utf-8").replace("{{FONT}}", font)
 
 
-def run_window(bus: UIBus, api: Api, backend, stop: threading.Event, hidden: bool = False):
+W, H, OW, OH = 400, 760, 170, 180
+
+
+def corner_geom(sw: int, sh: int, side: str = "left", saved=None) -> dict:
+    """Window and orb positions. Default: bottom-left, clear of the taskbar. A position
+    you dragged it to is kept (if it's still on screen)."""
+    margin, taskbar = 16, 56
+    if saved and 0 <= saved[0] <= sw - 80 and 0 <= saved[1] <= sh - 80:
+        x, y = saved
+    else:
+        x = margin if side == "left" else sw - W - margin
+        y = max(0, sh - H - taskbar)
+    left_half = x + W / 2 < sw / 2
+    ox = margin if left_half else sw - OW - margin
+    return {"full": (int(x), int(y), W, H), "orb": (int(ox), int(max(0, sh - OH - taskbar)), OW, OH), "screen": (sw, sh)}
+
+
+def run_window(bus: UIBus, api: Api, backend, stop: threading.Event, hidden: bool = False, saved_pos=None):
     """Blocks on the main thread (pywebview requirement); backend runs alongside."""
     import webview
     x = y = None
     try:
         s = webview.screens[0]
-        x, y = s.width - 420, max(0, s.height - 820)
-        bus.geom = {"full": (x, y, 400, 760), "orb": (s.width - 190, max(0, s.height - 250), 170, 180)}
+        bus.geom = corner_geom(s.width, s.height, "left", saved_pos)
+        x, y = bus.geom["full"][:2]
     except Exception:
         pass
     win = webview.create_window("Lazy-Monster", html=page_html(), js_api=api, width=400, height=760,
                                 x=x, y=y, frameless=True, on_top=True, easy_drag=True, resizable=False,
                                 background_color="#0D1117", hidden=hidden)
     bus.attach(win)
+    try:
+        win.events.moved += bus.on_moved           # remember where you put it
+    except Exception:
+        pass
 
     def main():
         backend()

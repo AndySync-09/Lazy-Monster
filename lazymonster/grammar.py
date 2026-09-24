@@ -54,6 +54,8 @@ RULES: List[Rule] = [
     ("brightness_set", _r(rf"(?:set |change |turn )?{_THE}brightness (?:to |at )?(?P<n>\d{{1,3}})(?: percent)?"),
      lambda m: {"level": min(int(m["n"]), 100)}),
     ("sleep", _r(rf"put {_THE}{_PC} to sleep|sleep {_THE}{_PC}|{_PC} sleep"), lambda m: {}),
+    ("move_monster", _r(r"(?:move|go|slide|scoot)(?: yourself| over)?(?: to)?(?: the)? (left|right)(?: side| corner)?"),
+     lambda m: {"side": m.group(1)}),
     ("exit_app", _r(r"(?:(?:you can|can you|please|now|okay|ok|just|man|dude)\s+)*(?:go\s+)?(?:to\s+|back to\s+)?sleep(?:\s+(?:now|please|man|dude))*"
                     r"|exit|quit|good ?night|good ?bye|bye(?: bye)?|nap time|take a nap|stop listening|that'?s all(?: for now)?"
                     r"|(?:thanks|thank you)[, ]+that'?s (?:all|it)|we'?re done(?: for now)?"), lambda m: {}),

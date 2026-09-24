@@ -77,11 +77,11 @@ class ChatClient:
     """Minimal OpenAI-compatible Chat Completions client."""
 
     def __init__(self, model: str, api_key_env: str = "OPENAI_API_KEY", base_url: str = "https://api.openai.com/v1",
-                 timeout: float = 90.0, reasoning_effort: str = ""):
+                 timeout: float = 90.0, reasoning_effort: str = "", key_required: bool = True):
         self.model, self.base_url, self.timeout, self.reasoning_effort = model, base_url.rstrip("/"), timeout, reasoning_effort
         from .secrets import get_key
-        self.key = get_key(api_key_env)
-        if not self.key:
+        self.key = get_key(api_key_env) if api_key_env else ""
+        if not self.key and key_required:
             raise AgentError(f"{api_key_env} is not set")
 
     def chat(self, messages, tools=None) -> dict:
@@ -92,7 +92,7 @@ class ChatClient:
         if self.reasoning_effort:
             body["reasoning_effort"] = self.reasoning_effort
         r = requests.post(f"{self.base_url}/chat/completions", json=body, timeout=self.timeout,
-                          headers={"Authorization": f"Bearer {self.key}"})
+                          headers={"Authorization": f"Bearer {self.key or 'local'}"})
         if r.status_code == 400 and self.reasoning_effort and "reasoning" in r.text.lower():
             self.reasoning_effort = ""                # model doesn't take it: drop and retry once
             return self.chat(messages, tools)
@@ -194,7 +194,7 @@ class Agent:
             return
         try:
             from . import journal
-            journal.add(task, summary, journal.files_in(results))
+            journal.add(task, summary, journal.files_in(results), tools=getattr(self, "_tools_used", []))
         except Exception:
             pass
 
@@ -292,6 +292,7 @@ class Agent:
         self.cancel.clear()
         results = []
         client = self.client
+        self._tools_used = []
         questions = 0
         first_action = None
         escalated = False
@@ -395,6 +396,7 @@ class Agent:
                             self.on_sleep()
                         return True
                     if intent.name in ("close_all", "recent_work", "web_research"):
+                        self._tools_used.append(intent.name)
                         if intent.name == "close_all":
                             out = self._close_all()
                         elif intent.name == "web_research":
@@ -422,6 +424,7 @@ class Agent:
                     if not narrated and self.on_progress and self.clock() - t_start > 10:
                         narrated = True                   # one short update on long tasks, never a play-by-play
                         self.on_progress(intent.name)
+                    self._tools_used.append(intent.name)
                     t1 = self.clock()
                     if first_action is None:
                         first_action = round(t1 - t_start, 1)
@@ -447,6 +450,21 @@ def _short(args: dict, text: str) -> str:
     a = {k: (v[:50] + "…" if isinstance(v, str) and len(v) > 50 else v) for k, v in args.items()}
     first = (text or "").splitlines()[0][:120] if text else ""
     return f"{a} -> {first}"
+
+
+class LocalClient(ChatClient):
+    """A model on your own machine or network: Ollama, llama.cpp server, vLLM, LM Studio,
+    or anything else with an OpenAI-style /chat/completions. It has no web search of
+    its own, so research goes through websearch.py (DuckDuckGo or Brave)."""
+
+    def __init__(self, base_url: str, model: str, api_key_env: str = "LOCAL_LLM_API_KEY", timeout: float = 180.0):
+        if not base_url:
+            raise AgentError("local_base_url is not set (run the installer again, or set it in settings)")
+        super().__init__(model, api_key_env, base_url, timeout, "", key_required=False)
+
+    def research(self, question: str) -> str:
+        from .websearch import research
+        return research(self, question)
 
 
 class ClaudeClient:
@@ -554,8 +572,10 @@ class ClaudeClient:
 
 
 def build_client(cfg, escalation: bool = False):
-    """The agent's brain. escalation=True returns the stronger model for hard tasks (or None)."""
+    """The agent's brain. escalation=True returns the "go big" model for hard tasks (or None)."""
     p = cfg.planner.lower()
+    if escalation and not cfg.go_big:
+        return None
     if p == "openai":
         model = cfg.escalation_model if escalation else cfg.openai_model
         if escalation and (not model or model == cfg.openai_model):
@@ -566,7 +586,16 @@ def build_client(cfg, escalation: bool = False):
         if escalation and (not model or model == cfg.anthropic_model):
             return None
         return ClaudeClient(model, cfg.anthropic_api_key_env, cfg.anthropic_base_url, cfg.openai_timeout)
+    if p == "local":
+        if not escalation:
+            return LocalClient(cfg.local_base_url, cfg.local_model, cfg.local_api_key_env, cfg.local_timeout)
+        from .secrets import get_key                     # going big from a local brain means a cloud model
+        if get_key(cfg.openai_api_key_env) and cfg.escalation_model:
+            return ChatClient(cfg.escalation_model, cfg.openai_api_key_env, cfg.openai_base_url, cfg.openai_timeout, "")
+        if get_key(cfg.anthropic_api_key_env) and cfg.anthropic_escalation_model:
+            return ClaudeClient(cfg.anthropic_escalation_model, cfg.anthropic_api_key_env, cfg.anthropic_base_url)
+        return None
     if p == "jev":
         raise AgentError("Jev is a decision model (yes/no, choice, score), not a brain that writes. "
-                         "Set planner to openai or anthropic, and decider = \"jev\" to use Jev alongside it.")
+                         "Set planner to openai, anthropic or local, and decider = \"jev\" to use Jev alongside it.")
     return None

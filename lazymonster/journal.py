@@ -24,7 +24,21 @@ def files_in(texts: List[str]) -> List[str]:
     return list(dict.fromkeys(out))[:6]
 
 
-def add(task: str, summary: str, files: List[str]) -> None:
+WORK_TOOLS = {"write_in_app", "type_text", "word_insert_text", "word_save", "code_write_file", "code_run",
+              "make_presentation", "export_pdf", "web_research", "open_file", "file_write_text", "close_all"}
+_FOLLOWUP = re.compile(r"^\s*(yes|yeah|sure|ok(ay)?)?[,.!\s]*please do that\b", re.I)
+
+
+def worth_keeping(task: str, tools: List[str]) -> bool:
+    """Only real work goes in the journal: not "mute", not an accepted suggestion echo."""
+    if _FOLLOWUP.match(task or "") or len((task or "").split()) < 3:
+        return False
+    return bool(set(tools or []) & WORK_TOOLS)
+
+
+def add(task: str, summary: str, files: List[str], tools: List[str] = None) -> None:
+    if tools is not None and not worth_keeping(task, tools):
+        return
     p = path()
     p.parent.mkdir(parents=True, exist_ok=True)
     with open(p, "a", encoding="utf-8") as f:
@@ -52,14 +66,29 @@ def short_task(task: str) -> str:
     return " ".join(words[:9]) + ("…" if len(words) > 9 else "")
 
 
+def _clean_summary(s: str) -> str:
+    s = re.sub(r"^\s*(done|okay|ok|sure|all set)[.!,:\s\u2014-]*", "", s or "", flags=re.I).strip()
+    s = re.split(r"(?<=[.!?])\s", s)[0].rstrip(".!? ")                 # first sentence only
+    if not s or re.match(r"I\b", s):
+        return s
+    return s[:1].lower() + s[1:]
+
+
 def recap(rows=None) -> str:
     rows = recent() if rows is None else rows
-    items = list(dict.fromkeys(short_task(r["task"]) for r in reversed(rows) if len(r["task"].split()) >= 3))[:3]
+    rows = [r for r in rows if not _FOLLOWUP.match(r.get("task", "")) and len(r.get("task", "").split()) >= 3]
+    items = []
+    for r in reversed(rows):
+        s = _clean_summary(r.get("summary", "")) or short_task(r["task"])
+        if s and s not in items:
+            items.append(s)
+        if len(items) == 2:
+            break
     if not items:
         return ""
     if len(items) == 1:
-        return f"Last time we worked on: {items[0]}."
-    return "Recently we worked on: " + ", ".join(items[:-1]) + f", and {items[-1]}."
+        return f"Last time, {items[0]}."
+    return f"Last time, {items[0]}. Before that, {items[1]}."
 
 
 def context(rows=None) -> str:

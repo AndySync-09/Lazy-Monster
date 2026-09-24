@@ -19,7 +19,12 @@ class Config:
     require_prefix: bool = True
     always_listen: bool = False
     apps: dict = field(default_factory=dict)
-    planner: str = "openai"          # openai | anthropic | none  (the agent's brain)
+    planner: str = "openai"          # openai | anthropic | local | none  (the agent's brain)
+    go_big: bool = False             # hard tasks move to a stronger (pricier) model
+    local_base_url: str = ""         # e.g. http://localhost:11434/v1 (Ollama), :8080/v1 (llama.cpp), :8000/v1 (vLLM)
+    local_model: str = ""
+    local_api_key_env: str = "LOCAL_LLM_API_KEY"   # only if your server needs one
+    local_timeout: float = 180.0
     decider: str = ""                # "jev": TypeSafe's Jev makes fast yes/no/choice calls around the brain
     accelerator: str = "auto"        # auto | npu | gpu | cpu  (for on-device models)
     agent_max_steps: int = 16
@@ -46,6 +51,8 @@ class Config:
     acks: bool = True                # say "On it" when a task starts
     greet: bool = True               # "Hi Andy, how can I help?" after a bare "Hey Monster"
     user_name: str = ""              # empty = first name from your Windows account
+    window_x: int = -1               # where you dragged the window (-1 = bottom-left corner)
+    window_y: int = -1
     hide_after: float = 0.0          # background mode: hide the orb entirely after this long asleep (0 = keep the orb)
     voice_lock: bool = True          # once enrolled (monster voice-enroll), act only on your voice
     push_to_talk: str = "ctrl+alt+space" if os.name == "nt" else "cmd+shift+space"   # global hotkey; "" = off

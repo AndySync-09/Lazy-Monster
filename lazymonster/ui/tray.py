@@ -82,6 +82,12 @@ class Tray:
                 e.verify = self._saved_verify
             save_setting("voice_lock", e.verify is not None)
 
+        def retrain(icon, item):
+            import subprocess
+            import sys
+            exe = str(Path(sys.executable).with_name("monster.exe"))
+            subprocess.Popen(["cmd", "/c", "start", "Retrain Lazy-Monster", exe, "voice-reset", "--train"])
+
         menu = pystray.Menu(
             pystray.MenuItem("Talk now", talk, default=True),
             pystray.MenuItem("Show window", show_window),
@@ -95,6 +101,7 @@ class Tray:
             pystray.MenuItem("Open LazyMonster folder", lambda icon, item: _open(out_dir())),
             pystray.MenuItem("Open settings", open_settings),
             pystray.MenuItem("Open history log", lambda icon, item: _open(config_dir() / "log.jsonl")),
+            pystray.MenuItem("Retrain my voice…", retrain),
             pystray.Menu.SEPARATOR,
             pystray.MenuItem("Quit Lazy-Monster", lambda icon, item: self.stop.set()),
         )

@@ -84,7 +84,7 @@ One command in PowerShell (Windows 10 or 11, no admin rights):
 irm https://raw.githubusercontent.com/AndySync-09/lazy-monster/main/install.ps1 | iex
 ```
 
-First it asks which brain to use, **OpenAI** or **Claude**, and checks your key. Optionally it adds **Jev** by TypeSafe, which makes the fast decisions around the brain (was that meant for me, which tool, did you say yes). Then it finds or installs Python, installs Lazy-Monster in its own folder, downloads the voice models, learns your voice, and starts it in the background.
+First it sets up the brain: **OpenAI**, **Claude**, or a **local model** (Ollama, llama.cpp, vLLM, LM Studio), and checks it works. Optionally it adds **Jev** by TypeSafe, which makes the fast decisions around the brain (was that meant for me, which tool, did you say yes). Then it finds or installs Python, installs Lazy-Monster in its own folder, downloads the voice models, learns your voice, and starts it in the background.
 
 Make it yours (voices, your own speech and voice models, the brain): see [docs/VOICES.md](docs/VOICES.md). Run it again to update. Prefer to read it first? See [install.ps1](install.ps1). To remove: `uninstall.ps1` in `%LOCALAPPDATA%\LazyMonster\app`.
 

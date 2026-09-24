@@ -50,10 +50,21 @@ On a Mac: `stt_model_mac_arm` (an MLX Whisper repo or folder) and `stt_model_mac
 The brain writes and plans: OpenAI or Claude, chosen during install. Change it later:
 
 ```toml
-planner = "anthropic"                         # openai | anthropic | none
+planner = "anthropic"                         # openai | anthropic | local
+go_big = true                                 # hard tasks on the stronger model
 anthropic_model = "claude-haiku-4-5-20251001"
 anthropic_escalation_model = "claude-sonnet-5"
 ```
+
+**Local models.** Ollama, llama.cpp (`llama-server --jinja`), vLLM (`--enable-auto-tool-choice`) or LM Studio:
+
+```toml
+planner = "local"
+local_base_url = "http://localhost:11434/v1"
+local_model = "qwen3:8b"                      # must support tool calling
+```
+
+With a local brain, web research searches DuckDuckGo, or Brave Search if you set `BRAVE_API_KEY`, and summarises the pages locally.
 
 **Jev** (TypeSafe) is optional and works next to the brain. It doesn't write text; it answers typed questions (yes/no, a choice, a score) in milliseconds. The monster uses it to decide whether speech without a wake word was meant for it, which tool fits a request (the decision tree shows Jev's real probabilities), whether a task is hard enough to start on the stronger model, and whether "sure, go for it" means yes. If Jev is slow or unreachable, the monster simply carries on without it.
 

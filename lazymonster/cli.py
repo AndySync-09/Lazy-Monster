@@ -271,11 +271,33 @@ def _conversation(cfg, engine, speaker, stop, emit=lambda ev: None):
     return conv
 
 
+BRAIN_COLORS = {"openai": "#10A37F", "anthropic": "#E08A5E", "claude": "#E08A5E", "local": "#9DB8FF"}
+
+
+def status_event(cfg, agent_enabled: bool, info: dict, voice: str) -> dict:
+    """The animated status bar: ears, brain, lock, chips (details on hover)."""
+    wake = info.get("wake", "")
+    dev = "NPU" if "NPU" in wake else ("CPU" if "CPU" in wake else "")
+    p = cfg.planner.lower()
+    short = {"openai": cfg.openai_model, "anthropic": "Claude " + cfg.anthropic_model.replace("claude-", "").split("-2")[0],
+             "claude": "Claude", "local": "Local \u00b7 " + (cfg.local_model or "model")}.get(p, "")
+    if (cfg.decider or "") == "jev" and short:
+        short += " + Jev"
+    return {"type": "status", "wake_dev": dev or "ears",
+            "wake_title": f"{wake}. {info.get('stt', '')}." + (f" Push-to-talk: {info['ptt']}." if info.get("ptt") else ""),
+            "brain": short if agent_enabled else "", "big": bool(cfg.go_big and agent_enabled),
+            "brain_title": ("Brain: " + brain_label(cfg, agent_enabled) + (" \u00b7 goes big on hard tasks" if cfg.go_big else ""))
+                           if agent_enabled else "No brain yet: quick commands only. Run the installer to add one.",
+            "brain_color": BRAIN_COLORS.get(p, ""), "lock": info.get("lock") == "voice lock on",
+            "chips_title": f"NPU: wake word \u00b7 {info.get('stt', 'Whisper')} \u00b7 CPU: {voice}"}
+
+
 def brain_label(cfg, enabled=True) -> str:
     if not enabled:
         return "agent off"
     p = cfg.planner.lower()
-    base = {"openai": cfg.openai_model, "anthropic": cfg.anthropic_model, "claude": cfg.anthropic_model}.get(p, p)
+    base = {"openai": cfg.openai_model, "anthropic": cfg.anthropic_model, "claude": cfg.anthropic_model,
+            "local": f"local {cfg.local_model} at {cfg.local_base_url}"}.get(p, p)
     return base + (" + Jev" if (cfg.decider or "").lower() == "jev" else "")
 
 
@@ -365,16 +387,15 @@ def cmd_ui(a, cfg):
             held["tray"] = Tray(bus, speaker, gate, det_ref, stop, conv=conv, engine=engine).start()
         except Exception as e:
             print(f"  tray icon off ({type(e).__name__}: {str(e)[:80]})")
-        agent = brain_label(cfg, engine.agent_enabled)
         voice = {"kokoro": f"Kokoro {cfg.kokoro_voice}", "openai": "OpenAI voice", "windows": "Windows voice"}.get(cfg.voice, "silent")
-        bus.emit({"type": "chips", "items": [info["wake"], info["lock"], info["stt"], voice, agent]
-                  + ([f"talk: {info['ptt']}"] if info.get("ptt") else []) + (["DRY RUN"] if a.dry_run else [])})
+        bus.emit(status_event(cfg, engine.agent_enabled, info, voice))
         conv.set("sleeping", 'say "Hey Monster" or type below')
 
     # "Hey Monster, sleep" shrinks to a small sleeping orb and keeps listening, in every UI mode.
     # "Hey Monster", the hotkey or a click on the orb brings the full window back. Quit is in the tray.
     from . import conversation as C
     engine.exit_message = "Okay. I'll be right here, just say Hey Monster."
+    engine.on_move = bus.move_to
     engine.on_exit = lambda: conv.set(C.SLEEPING)
     orb_state = {"on": False, "t": 0}
 
@@ -418,7 +439,8 @@ def cmd_ui(a, cfg):
             threading.Thread(target=auto_hide, daemon=True).start()
     print(f"Lazy-Monster {__version__} · UI · {'DRY RUN' if a.dry_run else 'LIVE'}" + (" · background" if background else ""))
     try:
-        run_window(bus, api, backend, stop, hidden=background)
+        run_window(bus, api, backend, stop, hidden=background,
+                   saved_pos=(cfg.window_x, cfg.window_y) if cfg.window_x >= 0 else None)
     finally:
         stop.set()
         if held.get("mic"):
@@ -462,6 +484,10 @@ def cmd_wake_train(a, cfg):
             tui.say(f"Talk about anything for 6 seconds ({i + 1}/3). Your day, lunch, the weather…")
             user_neg.append(rec.timed("chatting", 6.0))
             tui.ok("Perfect, that's not me.")
+        tui.say("Now 20 seconds of your normal room: type, click, let the fan run. Don't say the wake word.")
+        room = rec.timed("room sounds", 20.0)
+        user_neg += [room[i:i + 16000 * 5] for i in range(0, len(room) - 16000 * 5 + 1, 16000 * 5)]
+        tui.ok("Got your room. That's what false wakes are made of.")
         tui.say("Last one: stay quiet for 5 seconds.")
         user_neg.append(rec.timed("quiet", 5.0))
         tui.ok("Shhh. Done.")
@@ -606,6 +632,31 @@ def cmd_voice_enroll(a, cfg):
     return 0
 
 
+def cmd_voice_reset(a, cfg):
+    """Forget the trained wake word and voiceprint; with --train, retrain both now."""
+    from . import service, tui
+    from .config import save_setting
+    from .voicelock import print_path
+    from .wakeword import model_path
+    tui.enable()
+    was_running = bool(service.running()) if (os.name == "nt" or sys.platform == "darwin") else False
+    if was_running:
+        service.stop()
+        time.sleep(1.0)
+    for p in (model_path(), print_path()):
+        p.unlink(missing_ok=True)
+    save_setting("voice_lock", False)
+    tui.ok("Forgot your wake word and voiceprint.")
+    rc = 0
+    if a.train:
+        rc = cmd_wake_train(argparse.Namespace(samples=15, no_record=False, device=None), cfg)
+        cmd_voice_enroll(argparse.Namespace(device=None), cfg)
+    if was_running:
+        service.start()
+        tui.ok("The monster is back up with your new voice.")
+    return rc
+
+
 def cmd_voice_lock(a, cfg):
     from .config import save_setting
     on = a.state == "on"
@@ -641,7 +692,7 @@ def cmd_update(a, cfg):
         print("update: pull the repo instead"); return 1
     print("Updating Lazy-Monster (this window will show the installer)...")
     return subprocess.call(["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command",
-                            f"$env:LM_SKIP_VOICE='1'; $env:LM_BRAIN='{cfg.planner}'; "
+                            f"$env:LM_SKIP_VOICE='1'; $env:LM_BRAIN='keep'; "
                             f"$env:LM_JEV='{'y' if cfg.decider == 'jev' else 'n'}'; irm {INSTALL_URL} | iex"])
 
 
@@ -1055,6 +1106,8 @@ def main(argv=None):
     wtt = sub.add_parser("wake-test", help="live meter for the Hey Monster wake word")
     wtt.add_argument("--seconds", type=int, default=20)
     sub.add_parser("voice-enroll", help="record your voiceprint for the voice lock")
+    vr = sub.add_parser("voice-reset", help="forget your trained voice (and retrain with --train)")
+    vr.add_argument("--train", action="store_true")
     vl = sub.add_parser("voice-lock", help="turn the voice lock on or off")
     vl.add_argument("state", choices=["on", "off"])
     sub.add_parser("update", help="update to the newest version (keeps your settings and models)")
@@ -1081,7 +1134,7 @@ def main(argv=None):
     fn = {"run": cmd_run, "text": cmd_text, "bench-text": cmd_bench_text, "record": cmd_record,
           "bench-audio": cmd_bench_audio, "apps": cmd_apps, "do": cmd_do, "npu": cmd_npu, "doctor": cmd_doctor, "say": cmd_say, "ui": cmd_ui, "models": cmd_models,
           "wake-train": cmd_wake_train, "wake-test": cmd_wake_test, "service": cmd_service,
-          "voice-enroll": cmd_voice_enroll, "voice-lock": cmd_voice_lock, "voices": cmd_voices, "voice-test": cmd_voice_test, "update": cmd_update, "permissions": cmd_permissions}[a.cmd]
+          "voice-enroll": cmd_voice_enroll, "voice-lock": cmd_voice_lock, "voice-reset": cmd_voice_reset, "voices": cmd_voices, "voice-test": cmd_voice_test, "update": cmd_update, "permissions": cmd_permissions}[a.cmd]
     sys.exit(fn(a, cfg) or 0)
 
 
