@@ -34,6 +34,9 @@ body.set #settings{transform:none}
 #settings .msg{font-size:12px;color:var(--lime);margin-top:8px;min-height:15px}
 #settings input[type=range]{flex:1;accent-color:#C6F432}
 #settings small{color:var(--muted);font-size:11px}
+#settings .foot{position:sticky;bottom:-20px;margin:16px -16px -20px;padding:12px 16px 16px;background:linear-gradient(transparent,#0B0F16 30%);display:flex;gap:8px;align-items:center}
+#settings .save{flex:1;border:0;border-radius:12px;padding:11px;font:inherit;font-weight:600;font-size:13px;background:var(--lime);color:#0D1117;cursor:pointer}
+#settings .save:active{transform:translateY(1px)}
 #stateline{flex:none;height:3px;margin:6px 12px 0;border-radius:3px;background:linear-gradient(90deg,#1B2130 0%,var(--sl,#7C5CFF) 35%,#fff8 50%,var(--sl,#7C5CFF) 65%,#1B2130 100%);background-size:250% 100%;animation:slide 3.2s linear infinite;box-shadow:0 0 10px -2px var(--sl,#7C5CFF)}
 @keyframes slide{from{background-position:200% 0}to{background-position:-200% 0}}
 body[data-state=sleep]{--sl:#7C5CFF}body[data-state=listen]{--sl:#C6F432}body[data-state=speak]{--sl:#FF5FA2}
@@ -209,6 +212,7 @@ say('');sub('say "Hey Monster"');
   <small>Or just drag the window; it remembers.</small>
  </div>
  <div class="msg" id="sMsg"></div>
+ <div class="foot"><button class="save" id="sSave">Save &amp; close</button></div>
 </div>
 <script>
 (function(){const $=id=>document.getElementById(id),A=()=>window.pywebview&&window.pywebview.api;let S=null;
@@ -224,9 +228,17 @@ function paint(){$('sVer').textContent='Lazy-Monster '+S.version+' \u00b7 '+S.br
  paintProv();sw('sBig',S.go_big);sw('sJev',S.decider==='jev');sw('sConv',S.conversation_mode);sw('sBarge',S.barge_in);sw('sLock',S.voice_lock);
  const v=$('sVoice');v.innerHTML='';S.voices.forEach(([k,d])=>{const o=document.createElement('option');o.value=k;o.textContent=k+'  \u00b7 '+d;if(k===S.voice)o.selected=true;v.appendChild(o);});
  $('sSens').value=S.wake_sensitivity;$('sSensT').textContent=S.wake_sensitivity>0?'more eager':S.wake_sensitivity<0?'more strict':'balanced';$('sPtt').value=S.push_to_talk;$('sLocal').value=S.local_base_url||'';}
-async function open(){if(!A())return;S=await A().get_settings();S.shown=S.planner;paint();document.body.classList.add('set');}
-$('gear').onclick=()=>document.body.classList.contains('set')?document.body.classList.remove('set'):open();
-$('setClose').onclick=()=>document.body.classList.remove('set');
+async function open(){if(!A())return;A().ui_busy(true);S=await A().get_settings();S.shown=S.planner;paint();document.body.classList.add('set');}
+function close(){document.body.classList.remove('set');A()&&A().ui_busy(false);}
+$('gear').onclick=()=>document.body.classList.contains('set')?close():open();
+$('setClose').onclick=close;
+$('sSave').onclick=async()=>{const out=[];const p=S.shown||S.planner;
+ if($('sKey').value.trim()){out.push(await A().set_key(p,$('sKey').value));$('sKey').value='';}
+ if(p==='local'&&$('sLocal').value.trim()&&$('sLocal').value.trim()!==(S.local_base_url||'')){out.push(await A().set_setting('local_base_url',$('sLocal').value));}
+ if($('sPtt').value.trim()&&$('sPtt').value.trim()!==S.push_to_talk){out.push(await A().set_setting('push_to_talk',$('sPtt').value));}
+ if(p!==S.planner&&S.have[p]){out.push(await A().set_setting('planner',p));}
+ flash('sMsg',out.length?out[out.length-1]:'All changes saved.');$('sSave').textContent='Saved \u2713';
+ setTimeout(()=>{$('sSave').textContent='Save & close';close();},900);};
 $('sModel').onchange=async e=>flash('sBrainMsg',await A().set_setting('model',{provider:S.shown||S.planner,model:e.target.value}));
 $('sTest').onclick=async()=>{flash('sBrainMsg','Asking the brain\u2026');flash('sBrainMsg',await A().test_brain());};
 $('sKeySave').onclick=async()=>{const p=S.shown||S.planner;flash('sBrainMsg',await A().set_key(p,$('sKey').value));$('sKey').value='';S=await A().get_settings();S.shown=p;paint();};
@@ -239,6 +251,8 @@ $('sSens').onchange=async e=>{const v=parseFloat(e.target.value);$('sSensT').tex
 $('sPtt').onchange=async e=>flash('sMsg',await A().set_setting('push_to_talk',e.target.value));
 $('sRetrain').onclick=async()=>flash('sMsg',await A().retrain_voice());
 document.querySelectorAll('#settings [data-side]').forEach(b=>b.onclick=async()=>flash('sMsg',await A().set_setting('side',b.dataset.side)));
-window.lmOpenSettings=open;})();
+window.lmOpenSettings=open;
+const inp=document.getElementById('inp');if(inp){inp.addEventListener('focus',()=>A()&&A().ui_busy(true));inp.addEventListener('blur',()=>{if(!document.body.classList.contains('set'))A()&&A().ui_busy(false);});}
+})();
 </script></body></html>
 

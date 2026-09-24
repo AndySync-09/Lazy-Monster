@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.2.1
+- Fix: the settings panel shrank into the sleeping orb after a few seconds. While settings are open (or you're typing in the box) the window stays full size; it goes back to the orb a few seconds after you close them.
+- **Save & close** at the bottom of settings: saves anything still typed in (a key, the local address, the push-to-talk key, a picked brain) and confirms.
+- **The monster icon everywhere**: on the window itself (Alt+Tab, title, any taskbar button) instead of Python's, and a crisper tray icon. The tray-only window style is now re-applied after every show and orb change, and logs if Windows refuses it.
+
 ## 1.2.0: settings, live brains, real conversation
 **Change anything, live**
 - **Settings panel** (gear icon, or tray > Settings…): brain (OpenAI, Claude, Local), the model (listed live from your key or server, so new models show up by themselves), a Test button, paste a key, the local address, go big, Jev, the voice with a preview, conversation mode, interrupt-by-talking, voice lock, wake sensitivity, push-to-talk key, retrain voice, left or right corner. Changes apply without a restart (push-to-talk key and Jev after one).

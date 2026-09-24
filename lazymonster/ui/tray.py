@@ -107,7 +107,8 @@ class Tray:
             pystray.Menu.SEPARATOR,
             pystray.MenuItem("Quit Lazy-Monster", lambda icon, item: self.stop.set()),
         )
-        img = Image.open(Path(__file__).parent / "icon.png")
+        ico = Path(__file__).parent / "monster.ico"
+        img = Image.open(ico if ico.exists() else Path(__file__).parent / "icon.png")
         self.icon = pystray.Icon("lazy-monster", img, "Lazy-Monster", menu)
         self.icon.run_detached()
         return self

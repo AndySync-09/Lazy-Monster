@@ -50,8 +50,14 @@ class UIBus:
         fx, fy = self.geom["full"][:2]
         save_setting("window_x", fx); save_setting("window_y", fy)
 
+    def hold(self, on: bool):
+        """The settings panel (or typing) is open: stay full size until it closes."""
+        self.held = bool(on)
+
     def set_orb(self, on: bool):
         """Shrink to a small sleeping orb at the screen edge, or back to the full window."""
+        if on and getattr(self, "held", False):
+            return                                   # you're using the window; don't shrink under you
         if on == self.orb or self.window is None:
             return
         self.orb = on
@@ -63,6 +69,7 @@ class UIBus:
                 self.window.move(x, y)
             if not on:
                 self.window.show()
+            tool_window(self.window, log=lambda m: None)
         except Exception:
             pass
 
@@ -144,6 +151,17 @@ class Api:
         self._engine, self._stop, self._bus, self._speaker, self._conv = engine, stop, bus, speaker, conv
 
     # ---- settings panel (everything saves and applies live) ----
+    def ui_busy(self, on):
+        """The page tells us when settings are open or you're typing."""
+        self._bus.hold(bool(on))
+        if not on and self._conv is not None:
+            def later():
+                if not getattr(self._bus, "held", False) and self._conv.state == "sleeping":
+                    self._bus.set_orb(True)
+            t = threading.Timer(4.0, later)
+            t.daemon = True
+            t.start()
+
     def get_settings(self):
         return self._ctl.get() if getattr(self, "_ctl", None) else {}
 
@@ -215,28 +233,52 @@ def corner_geom(sw: int, sh: int, side: str = "left", saved=None) -> dict:
     return {"full": (int(x), int(y), W, H), "orb": (int(ox), int(max(0, sh - OH - taskbar)), OW, OH), "screen": (sw, sh)}
 
 
-def tool_window(win) -> None:
-    """Windows: no taskbar button and no Alt+Tab entry; the tray icon is its home."""
+ICON = Path(__file__).with_name("monster.ico")
+
+
+def _hwnd(win):
+    import win32gui
+    try:
+        return int(win.native.Handle.ToInt64())
+    except Exception:
+        return win32gui.FindWindow(None, "Lazy-Monster")
+
+
+def monster_icon(hwnd) -> None:
+    """The monster instead of Python, wherever Windows shows this window's icon."""
+    import win32con
+    import win32gui
+    flags = win32con.LR_LOADFROMFILE | win32con.LR_DEFAULTSIZE
+    big = win32gui.LoadImage(0, str(ICON), win32con.IMAGE_ICON, 48, 48, flags)
+    small = win32gui.LoadImage(0, str(ICON), win32con.IMAGE_ICON, 16, 16, flags)
+    win32gui.SendMessage(hwnd, win32con.WM_SETICON, win32con.ICON_BIG, big)
+    win32gui.SendMessage(hwnd, win32con.WM_SETICON, win32con.ICON_SMALL, small)
+
+
+def tool_window(win, log=print) -> bool:
+    """Windows: monster icon, no taskbar button, no Alt+Tab entry; the tray icon is its home."""
     import os
     if os.name != "nt":
-        return
+        return True
     try:
         import win32con
         import win32gui
-        hwnd = None
-        try:
-            hwnd = int(win.native.Handle.ToInt64())
-        except Exception:
-            hwnd = win32gui.FindWindow(None, "Lazy-Monster")
+        hwnd = _hwnd(win)
         if not hwnd:
-            return
+            return False
+        monster_icon(hwnd)
         ex = win32gui.GetWindowLong(hwnd, win32con.GWL_EXSTYLE)
-        ex = (ex | win32con.WS_EX_TOOLWINDOW) & ~win32con.WS_EX_APPWINDOW
-        win32gui.ShowWindow(hwnd, win32con.SW_HIDE)
-        win32gui.SetWindowLong(hwnd, win32con.GWL_EXSTYLE, ex)
-        win32gui.ShowWindow(hwnd, win32con.SW_SHOWNOACTIVATE)
-    except Exception:
-        pass
+        want = (ex | win32con.WS_EX_TOOLWINDOW) & ~win32con.WS_EX_APPWINDOW
+        if want != ex:
+            visible = win32gui.IsWindowVisible(hwnd)
+            win32gui.ShowWindow(hwnd, win32con.SW_HIDE)
+            win32gui.SetWindowLong(hwnd, win32con.GWL_EXSTYLE, want)
+            if visible:
+                win32gui.ShowWindow(hwnd, win32con.SW_SHOWNOACTIVATE)
+        return True
+    except Exception as e:
+        log(f"  window style not applied ({type(e).__name__}: {e})")
+        return False
 
 
 def run_window(bus: UIBus, api: Api, backend, stop: threading.Event, hidden: bool = False, saved_pos=None):
@@ -261,6 +303,14 @@ def run_window(bus: UIBus, api: Api, backend, stop: threading.Event, hidden: boo
         win.events.shown += lambda: tool_window(win)
     except Exception:
         pass
+
+    def keep_style():                                  # also re-apply after hide/show and orb changes
+        import time as _t
+        for _ in range(20):
+            if tool_window(win, log=lambda m: None):
+                break
+            _t.sleep(0.5)
+    threading.Thread(target=keep_style, daemon=True).start()
 
     def main():
         backend()

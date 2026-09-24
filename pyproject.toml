@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "lazy-monster"
-version = "1.2.0"
+version = "1.2.1"
 description = "Local-first voice control and voice agent for Windows: streaming STT, semantic endpointing, typed allowlisted tools."
 requires-python = ">=3.11"
 license = { text = "Apache-2.0" }
@@ -52,4 +52,4 @@ monsterw = "lazymonster.cli:main"
 include = ["lazymonster*"]
 
 [tool.setuptools.package-data]
-lazymonster = ["data/*.csv", "ui/*.html", "ui/*.ttf", "ui/*.png"]
+lazymonster = ["data/*.csv", "ui/*.html", "ui/*.ttf", "ui/*.png", "ui/*.ico"]

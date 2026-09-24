@@ -530,7 +530,7 @@ def test_typed_text_skips_audio_refine():
 def test_ui_api_exposes_only_three_methods():
     from lazymonster.ui.app import Api
     api = Api(engine=object(), stop=None, bus=None)
-    assert [n for n in dir(api) if not n.startswith("_")] == ["compact", "get_settings", "hide", "list_models", "preview_voice", "retrain_voice", "set_key", "set_setting", "sleep", "stop_talking", "submit", "talk", "test_brain"]
+    assert [n for n in dir(api) if not n.startswith("_")] == ["compact", "get_settings", "hide", "list_models", "preview_voice", "retrain_voice", "set_key", "set_setting", "sleep", "stop_talking", "submit", "talk", "test_brain", "ui_busy"]
 
 
 # ---- 0.5.0 ---------------------------------------------------------------------------
