@@ -1793,4 +1793,12 @@ def test_quick_brain_only_sees_simple_requests():
     assert looks_simple("open spotify") and looks_simple("remind me in 20 minutes to stretch")
     assert not looks_simple("research the latest nvidia news and make three slides")
     assert not looks_simple("build a snake game in python") and not looks_simple("email Priya the menu")
-    assert len(SYSTEM.split()) < 140
+    assert len(SYSTEM.split()) < 300
+
+
+def test_quick_brain_near_misses_map_to_real_tools():
+    from lazymonster.npu_brain import normalize, parse
+    assert normalize(parse('{"tool": "mute()"}'))["tool"] == "mute"
+    assert normalize(parse('{"tool": "play_music", "args": {}}'))["tool"] == "media_play_pause"
+    assert normalize(parse('{"tool": "open_app", "args": {"app": "github.com"}}')) == {"tool": "open_url", "args": {"url": "github.com"}}
+    assert normalize(parse('{"tool": "open_app", "args": {"app": "Spotify"}}'))["tool"] == "open_app"

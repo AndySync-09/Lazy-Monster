@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.6.2
+- **Quick brain on the GPU: 0.6 s.** Measured on a Core Ultra 9 185H: the same Qwen2.5 1.5B model took 3.8 s per request on the NPU and 0.6 s on the Arc GPU, so the benchmark now prefers whichever is faster at equal accuracy.
+- **Accuracy back up.** The short prompt from 1.6.1 cost accuracy (11/12 fell to 7/12); on the GPU prompt length barely matters, so the descriptive prompt is back with more examples. Where OpenVINO supports it, the output is constrained to real tool names, so the model can't invent "play_music". Near-misses ("mute()", "play_music", "open github.com" as an app) are mapped to the real tool.
+- **Honest scoring.** The benchmark applies the same "clearly big" filter the monster uses, and counts a hand-off to the main brain as safe (just slower), separately from a wrong action. It picks a model only if it's right at least 70% of the time with at most one wrong action.
+
 ## 1.6.1
 - **Quick brain, faster.** On the NPU most of the 3.5 s went into reading a long prompt, so the prompt is now about a third of the size, and the model no longer writes the spoken confirmation (the monster fills it in: "Opening Spotify."), so it writes a third as much.
 - **No wait for big requests.** Requests that are obviously bigger (research, code, slides, email, files, the screen, "and then…", or more than 14 words) skip the quick brain and go straight to the main brain.

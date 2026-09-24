@@ -16,15 +16,44 @@ QUICK_TOOLS = {
     "write_in_app": "app, text", "set_reminder": "what, when", "list_reminders": "", "system_status": "",
 }
 
-# Short on purpose: on the NPU most of the time goes into reading the prompt, so every word costs.
-SYSTEM = ('Voice assistant router. Reply with one line of JSON: {"tool": name, "args": {...}}. '
-          'Use {"tool": "hand_off"} for anything with several steps, research, code, documents, files, email, '
-          "the screen, or if unsure.\nTools: " + "; ".join(f"{n}({a})" for n, a in QUICK_TOOLS.items()) + "\n"
-          'play music -> {"tool": "media_play_pause", "args": {}}\n'
+DESC = {"open_app": "open an app (Notepad, Spotify, Chrome)", "close_app": "close an app",
+        "search_web": "search the web", "open_url": "open a website address like github.com",
+        "volume_set": "set the volume 0-100", "mute": "mute the sound", "unmute": "unmute",
+        "media_play_pause": "play or pause music", "media_next": "next song", "new_tab": "new browser tab",
+        "write_in_app": "open an app and write short text you compose (haiku, note, list)",
+        "set_reminder": "remind the user; when = 'at 5 pm' or 'in 20 minutes'", "list_reminders": "say the user's reminders",
+        "system_status": "how the PC is doing: CPU, memory, what is slow"}
+
+# The descriptive prompt: on the GPU its length costs almost nothing, and the short one lost accuracy.
+SYSTEM = ("You route requests for a voice assistant on a Windows PC. Reply with ONE line of JSON and nothing else: "
+          '{"tool": "<name>", "args": {...}}. If the request needs several steps, research, code, documents, files, '
+          'email, the screen, or you are unsure, reply {"tool": "hand_off"}.\nTools:\n'
+          + "\n".join(f"- {n}({QUICK_TOOLS[n]}): {DESC[n]}" for n in QUICK_TOOLS) + "\nExamples:\n"
+          'play some music -> {"tool": "media_play_pause", "args": {}}\n'
+          'mute -> {"tool": "mute", "args": {}}\n'
+          'open github.com -> {"tool": "open_url", "args": {"url": "github.com"}}\n'
           'open spotify -> {"tool": "open_app", "args": {"app": "Spotify"}}\n'
+          'what are my reminders -> {"tool": "list_reminders", "args": {}}\n'
           'remind me at 5 to call priya -> {"tool": "set_reminder", "args": {"what": "call Priya", "when": "at 5 pm"}}\n'
           'write a haiku about rain in notepad -> {"tool": "write_in_app", "args": {"app": "Notepad", "text": "Soft rain on the roof\\nthe city exhales slowly\\npuddles hold the sky"}}\n'
           'build a snake game -> {"tool": "hand_off"}')
+
+ALIASES = {"play_music": "media_play_pause", "play": "media_play_pause", "pause": "media_play_pause",
+           "play_pause": "media_play_pause", "next_song": "media_next", "open_website": "open_url", "open_web": "open_url",
+           "reminders": "list_reminders", "get_reminders": "list_reminders", "set_volume": "volume_set",
+           "volume": "volume_set", "status": "system_status", "search": "search_web", "handoff": "hand_off"}
+_URL = __import__("re").compile(r"^(https?://)?[\w-]+(\.[\w-]+)+(/\S*)?$")
+
+
+def normalize(d: dict) -> dict:
+    """Small models say "mute()" or "play_music"; map those to the real tool."""
+    name = str(d.get("tool") or "").strip().split("(")[0].strip().lower().replace(" ", "_")
+    name = ALIASES.get(name, name)
+    args = d.get("args") if isinstance(d.get("args"), dict) else {}
+    if name == "open_app" and _URL.match(str(args.get("app", ""))):
+        name, args = "open_url", {"url": args["app"]}          # "open github.com"
+    return {"tool": name, "args": args}
+
 
 SAY = {"open_app": "Opening {app}.", "close_app": "Closing {app}.", "search_web": "Searching for {query}.",
        "open_url": "Opening it.", "volume_set": "Volume at {level}.", "mute": "Muted.", "unmute": "Sound's back.",
@@ -84,18 +113,36 @@ class QuickBrain:
         self.load_s = time.perf_counter() - t0
         self.device = device
         self.gen = ovg.GenerationConfig()
-        self.gen.max_new_tokens = 72
+        self.gen.max_new_tokens = 96
         self.gen.do_sample = False
+        self.constrained = False
+        try:
+            so = ovg.StructuredOutputConfig()
+            so.json_schema = json.dumps({"type": "object", "required": ["tool"], "properties": {
+                "tool": {"enum": list(QUICK_TOOLS) + ["hand_off"]}, "args": {"type": "object"}}})
+            self.gen.structured_output_config = so
+            self.constrained = True
+        except Exception:
+            pass
 
     def ask(self, request: str) -> Tuple[dict, float]:
         t0 = time.perf_counter()
         self.pipe.start_chat(SYSTEM)
         try:
-            out = self.pipe.generate(request, generation_config=self.gen)
+            try:
+                out = self.pipe.generate(request, generation_config=self.gen)
+            except Exception:
+                if not self.constrained:
+                    raise
+                self.constrained = False                    # this device can't constrain the output: plain JSON
+                self.gen.structured_output_config = None
+                self.pipe.finish_chat()
+                self.pipe.start_chat(SYSTEM)
+                out = self.pipe.generate(request, generation_config=self.gen)
         finally:
             self.pipe.finish_chat()
         text = out.texts[0] if hasattr(out, "texts") else str(out)
-        return parse(text), time.perf_counter() - t0
+        return normalize(parse(text)), time.perf_counter() - t0
 
     def handle(self, request: str):
         """(intent, words to say, seconds) for a simple request, or None to hand it to the main brain."""

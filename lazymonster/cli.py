@@ -954,22 +954,33 @@ def cmd_bench_brain(a, cfg):
         except Exception as e:
             tui.warn(f"  the {device} refused it: {type(e).__name__}: {str(e).splitlines()[0][:120]}")
             continue
-        right, times = 0, []
+        right = safe = wrong = 0
+        times = []
         qb.ask("open notepad")                                   # warm-up
         for req, want in nb.TESTS:
-            try:
-                d, secs = qb.ask(req)
-            except Exception as e:
-                d, secs = {"tool": f"error {type(e).__name__}"}, 0.0
-            got = d.get("tool")
-            ok = got == want
-            right += ok
-            times.append(secs)
-            print(f"   {'ok ' if ok else 'MISS'} {secs:4.1f} s  {req[:44]:<44} -> {got}")
+            if not nb.looks_simple(req):
+                got, secs, mark = "hand_off (skipped: clearly big)", 0.0, "ok  "
+                right += want == "hand_off"
+            else:
+                try:
+                    d, secs = qb.ask(req)
+                except Exception as e:
+                    d, secs = {"tool": f"error {type(e).__name__}"}, 0.0
+                got = d.get("tool")
+                times.append(secs)
+                if got == want:
+                    right, mark = right + 1, "ok  "
+                elif got == "hand_off":
+                    safe, mark = safe + 1, "safe"             # the main brain does it, just slower
+                else:
+                    wrong, mark = wrong + 1, "WRONG"
+            print(f"   {mark:<5} {secs:4.1f} s  {req[:44]:<44} -> {got}")
         acc = right / len(nb.TESTS)
-        med = sorted(times)[len(times) // 2]
-        tui.ok(f"  {right}/{len(nb.TESTS)} right, typical {med:.1f} s per request, loaded in {qb.load_s:.1f} s")
-        if acc >= 0.75 and (best is None or (round(acc, 2), -med) > (round(best[1], 2), -best[2])):
+        med = sorted(times)[len(times) // 2] if times else 0.0
+        tui.ok(f"  {right} right, {safe} handed off, {wrong} wrong; typical {med:.1f} s; loaded in {qb.load_s:.1f} s"
+               f"{'; output constrained to real tools' if qb.constrained else ''}")
+        good = wrong <= 1 and acc >= 0.7
+        if good and (best is None or (round(acc, 2), -med) > (round(best[1], 2), -best[2])):
             best = (repo, acc, med, device)
         del qb
     if best:
@@ -978,7 +989,8 @@ def cmd_bench_brain(a, cfg):
         tui.ok(f"Chosen: {best[0]} on the {best[3]} ({best[1]:.0%} right, {best[2]:.1f} s). Turn it on: monster brain --quick on "
                "(or Settings > Brain > Quick brain on the NPU), then restart the monster.")
     else:
-        tui.warn("None was right often enough (75%) to handle requests on its own. The main brain keeps doing everything.")
+        tui.warn("None was reliable enough (70% right and at most 1 wrong action) to act on its own. "
+                 "The main brain keeps doing everything.")
     return 0
 
 
