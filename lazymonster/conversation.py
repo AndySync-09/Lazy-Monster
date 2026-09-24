@@ -42,6 +42,8 @@ class Conversation:
         self.confirm_wake = None                # cli: second opinion (Whisper hears "monster", voice lock hears you)
         self.lock = None                        # voice lock: lets you interrupt just by talking
         self.on_remind = None                   # cli: show the window, tray notification
+        self.echo_tail = 0.35                   # seconds the mic stays shut after it speaks (echo.profile)
+        self.loud_output = False                # TV/HDMI/Bluetooth: its own voice comes back loud
         self.nudge_after = 300.0
         self.barge_in = True
         self._loud, self._checking, self._last_check = 0.0, False, -1e9
@@ -101,7 +103,7 @@ class Conversation:
         self.set(SPEAKING)
 
     def _speak_end(self):
-        time.sleep(0.2)                                          # let the room go quiet
+        time.sleep(self.echo_tail)                               # let its voice finish arriving (TVs are late)
         if getattr(self, "tap", None) is not None:
             self.tap.mark_speaking(False)
         if self.gate is not None:
@@ -279,7 +281,8 @@ class Conversation:
             return 0.0
         audio, sr, start = pl
         t = now - start
-        i0, i1 = int(max(0.0, t - 0.25) * sr), int(max(0.0, t + 0.05) * sr)
+        lag = max(0.25, self.echo_tail)                          # its voice reaches the mic this late
+        i0, i1 = int(max(0.0, t - lag) * sr), int(max(0.0, t + 0.05) * sr)
         seg = audio[i0:i1]
         return float(np.sqrt(np.mean(seg ** 2))) if len(seg) else 0.0
 
@@ -308,8 +311,13 @@ class Conversation:
 
         def go():
             try:
+                if self.loud_output and self.lock is None:
+                    return                                      # loud speakers, no voice lock: only "Hey Monster" interrupts
                 if self.lock is not None and tap is not None:
                     ok, score = self.lock.check(tap.raw(1.0))
+                    if self.loud_output and not (ok or score >= self.lock.threshold - 0.05):
+                        self.engine.log(event="barge_vetoed", score=round(float(score), 3), why="loud speakers")
+                        return
                     if not ok and 0 <= score < 0.35:            # clearly not you: a TV, someone else
                         self.engine.log(event="barge_vetoed", score=round(float(score), 3))
                         return

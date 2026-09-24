@@ -128,6 +128,8 @@ def _file_logger(cfg: Config):
             print(f"  finished in {ev['steps']} steps, {ev['s']} s" + (f" (first action after {fa} s)" if fa is not None else ""), flush=True)
         elif e == "not_you":
             print(f"  voice lock: not your voice (similarity {ev.get('score')}); ignored", flush=True)
+        elif e == "own_echo":
+            print(f"  ignored my own voice: {ev.get('text')}", flush=True)
         elif e == "barge_in":
             print(f"  you interrupted (voice {ev.get('score')})", flush=True)
         elif e == "quick_handoff":
@@ -158,6 +160,7 @@ def _start_voice(cfg, a, engine, apps, speaker, conv, on_partial=None, on_level=
     gate = conv.gate
     tap = AudioTap(device=getattr(a, "device", None)).start()
     conv.tap = tap                                     # its own voice is cut out of what Whisper hears
+    tap.tail = max(tap.tail, getattr(conv, "echo_tail", 0.35))
     tap.listeners.append(conv.on_audio)                # talk over the monster to interrupt it
     det_ref = {}
     if cfg.stt_refine:
@@ -288,6 +291,14 @@ def _conversation(cfg, engine, speaker, stop, emit=lambda ev: None):
     engine.turn_delay = cfg.turn_delay
     engine.followup_only_on_question = True
     engine.conversation_mode = cfg.conversation_mode
+    from .echo import EchoGuard, profile
+    prof = profile()
+    engine.echo = EchoGuard()
+    conv.echo_tail = cfg.echo_tail if cfg.echo_tail >= 0 else prof["tail"]
+    conv.loud_output = prof["loud"]
+    engine.log(event="audio_out", device=prof["device"][:60], kind=prof["kind"], tail=conv.echo_tail)
+    if speaker is not None:
+        speaker.on_said = engine.echo.record
     engine.followup_window = 20.0 if cfg.conversation_mode else 10.0
     conv.barge_in = cfg.barge_in
     conv.recap = True

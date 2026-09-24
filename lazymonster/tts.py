@@ -104,6 +104,7 @@ class Speaker:
         self.kokoro = None
         self.speaking = False
         self.on_fallback: Callable[[str], None] = lambda why: None
+        self.on_said: Callable[[str], None] = lambda text: None     # EchoGuard records what it said
 
     def say(self, text: str) -> None:
         text = _clean(text)
@@ -137,6 +138,10 @@ class Speaker:
                 print(f"  (voice unavailable: {str(e)[:80]})", flush=True)
             finally:
                 self.speaking = False
+                try:
+                    self.on_said(text)
+                except Exception:
+                    pass
                 self.on_end()
 
     def interrupt(self) -> None:

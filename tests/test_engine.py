@@ -1845,3 +1845,43 @@ def test_offline_simple_things_work_and_big_ones_wait():
     assert said[-1] == "Opening Notepad." and client.seen == []
     agent.run("research the latest nvidia news")
     assert "Brain-Break" in said[-1] and bb.waiting == ["research the latest nvidia news"] and client.seen == []
+
+
+# ---- 1.7.3: it doesn't hear itself ------------------------------------------------------------------
+def test_echo_guard_drops_its_own_words():
+    from lazymonster.echo import EchoGuard, profile
+    t = [100.0]
+    g = EchoGuard(clock=lambda: t[0])
+    g.record("I opened the cafe site in Chrome. Want me to update the menu?")
+    assert g.is_echo("update the menu") and g.is_echo("want me to update the menu")
+    assert not g.is_echo("yes please do that") and not g.is_echo("open notepad")
+    t[0] += 20
+    assert not g.is_echo("update the menu")                   # long after: that's you
+    assert profile("Intel(R) Display Audio (HDMI)")["tail"] == 0.9 and profile("Speakers (Realtek(R) Audio)")["kind"] == "laptop"
+    assert profile("Headphones (Sony WH-1000XM5)")["kind"] == "headphones"
+
+
+def test_own_echo_never_reaches_a_running_task():
+    from lazymonster.echo import EchoGuard
+    eng, ex, client, said, fb = make_agent([])
+    eng.echo = EchoGuard()
+    eng.echo.record("Writing the snake game now, this takes a minute")
+    eng.worker.busy.set()
+    heard = []
+    eng.worker.agent.hear = heard.append
+    eng.on_complete(5, "this takes a minute")
+    assert heard == []
+    eng.on_complete(6, "make the snake faster")
+    assert heard == ["make the snake faster"]
+    eng.worker.busy.clear()
+
+
+def test_scrap_of_audio_during_task_is_not_you():
+    eng, ex, client, said, fb = make_agent([])
+    eng.verify = lambda t0: (True, -1.0)                      # too short to judge
+    eng.worker.busy.set()
+    heard = []
+    eng.worker.agent.hear = heard.append
+    eng.on_complete(7, "okay")
+    assert heard == []
+    eng.worker.busy.clear()

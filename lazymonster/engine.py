@@ -58,6 +58,7 @@ class Engine:
         self.armed_source = "wake"                              # wake | followup
         self.trusted_until = 0.0                                # push-to-talk: skip the voice lock until then
         self.learn_voice = None                                 # learn from requests that were certainly you
+        self.echo = None                                        # EchoGuard: don't hear its own voice
         self.last_activity = 0.0
         # Turn-taking: the speech model splits a sentence at every pause; a turn collects
         # those lines until you have finished (turn_delay seconds of quiet), then acts once.
@@ -108,8 +109,9 @@ class Engine:
     def trust(self, seconds: float) -> None:
         self.trusted_until = self.clock() + seconds
 
-    def _is_you(self, first_seen: float, typed: bool) -> bool:
-        """Voice lock gate. Typed requests and push-to-talk are you by definition."""
+    def _is_you(self, first_seen: float, typed: bool, strict: bool = False) -> bool:
+        """Voice lock gate. Typed requests and push-to-talk are you by definition.
+        strict (while a task runs): audio too short to judge doesn't pass; it's usually a scrap of echo."""
         if typed or self.verify is None or self.clock() < self.trusted_until:
             return True
         try:
@@ -117,6 +119,8 @@ class Engine:
         except Exception:
             return True                                         # never lock you out on an error
         ok, score = (res if isinstance(res, tuple) else (bool(res), None))
+        if strict and score is not None and score < 0:
+            ok = False
         if not ok:
             self.log(event="not_you", score=None if score is None else round(float(score), 3))
         return bool(ok)
@@ -135,11 +139,21 @@ class Engine:
         return (now < self.armed_until or bool(self.pending and now < self.pending_until)
                 or self.worker.busy.is_set() or now - self.last_activity < 4.0)
 
+    def _own_echo(self, ln, text: str) -> bool:
+        """Words the monster itself just said, coming back through the speakers."""
+        if self.echo is not None and not ln.typed and self.echo.is_echo(text):
+            ln.fired = True
+            self.log(event="own_echo", text=text[:80])
+            return True
+        return False
+
     def on_partial(self, lid: int, text: str) -> None:
         self.last_activity = self.last_partial = self.clock()
         with self._lock:
             ln = self._line(lid)
             if ln.fired or self.turn is not None:        # mid-turn: wait for the whole sentence
+                return
+            if self._own_echo(ln, text):
                 return
             cmd = self._command(text, ln)
             if not cmd or _COMPOUND.search(cmd):
@@ -185,9 +199,12 @@ class Engine:
             ln = self._line(lid)
             if ln.fired:
                 return
+            if self._own_echo(ln, text):
+                return
             if self._agent_busy():                      # talking to a running task: no wake needed
                 ln.fired = True
-                if not self._is_you(ln.first_seen, ln.typed):
+                if not self._is_you(ln.first_seen, ln.typed, strict=True):
+                    self.log(event="not_you_in_task", text=text[:80])
                     return
                 woke, cmd = self.wake.split(text)
                 cmd = (cmd if woke else text).strip()
