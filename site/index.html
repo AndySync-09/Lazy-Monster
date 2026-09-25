@@ -4,11 +4,11 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Lazy-Monster: say it, the monster does it</title>
-<meta name="description" content="A local-first voice agent for Windows. Say Hey Monster and it opens apps, writes documents, builds slides and cleans up after itself, safely.">
+<meta name="description" content="A local-first voice agent for Windows AI PCs and Apple Silicon Macs. Say Hey Monster and it opens apps, writes documents, builds slides and cleans up after itself, safely.">
 <link rel="canonical" href="https://lazymonster.space/">
 <meta property="og:url" content="https://lazymonster.space/">
 <meta property="og:title" content="Lazy-Monster: say it, the monster does it">
-<meta property="og:description" content="A voice agent that lives on your Intel AI PC. Hears you on the NPU, thinks on the GPU, talks on the CPU, drives your real apps, and keeps working offline.">
+<meta property="og:description" content="A voice agent for Intel AI PCs and Apple Silicon Macs. It drives your real apps, keeps working offline, and now runs natively on macOS.">
 <meta property="og:image" content="https://raw.githubusercontent.com/AndySync-09/lazy-monster/main/docs/assets/brand/social-preview.png">
 <meta property="og:type" content="website">
 <meta name="twitter:card" content="summary_large_image">
@@ -305,6 +305,27 @@ footer{background:var(--ink);color:#D9D7EA;padding-block:64px 40px;position:rela
 @media (max-width:820px){.play{grid-template-columns:1fr}}
 .pen{background:#0F0B2A;border:4px solid var(--ink,#16142B);border-radius:32px;box-shadow:12px 12px 0 #C6F432;position:relative;aspect-ratio:1/1;display:grid;place-items:center;overflow:hidden}
 .pen svg{width:78%;height:auto;overflow:visible}.pen canvas{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+/* Mac launch */
+.navmac i{font-style:normal;font-size:11px;font-weight:700;background:var(--pink);color:#fff;border-radius:999px;padding:1px 7px;margin-left:4px;vertical-align:2px}
+.newmac{display:inline-flex;align-items:center;gap:10px;align-self:flex-start;background:var(--pink);color:#fff;border:2px solid var(--ink);border-radius:12px;padding:8px 14px;font-weight:700;box-shadow:4px 4px 0 var(--lime);transform:rotate(-2deg);animation:wob 2.6s ease-in-out infinite}
+.newmac b{background:#fff;color:var(--ink);border-radius:8px;padding:0 8px;font-size:13px}
+@keyframes wob{0%,80%,100%{transform:rotate(-2deg) scale(1)}88%{transform:rotate(2deg) scale(1.06)}94%{transform:rotate(-3deg) scale(1.02)}}
+.macsec{position:relative;padding-block:110px;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.05fr);gap:64px;align-items:center;background:
+ radial-gradient(900px 500px at 80% 40%,rgba(94,230,193,.18),transparent 70%),linear-gradient(180deg,#0E1A2E,#120B38);border-block:2px solid var(--ink);overflow:hidden}
+.macsec .h2 span{color:#5EE6C1}
+.mac-copy{display:flex;flex-direction:column;gap:22px;position:relative;z-index:1}
+.mac-pills{display:flex;flex-wrap:wrap;gap:8px}
+.mac-pills span{border:2px solid #5EE6C1;color:#5EE6C1;border-radius:999px;padding:4px 12px;font-weight:700;font-size:14px}
+.mac-feats{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.mac-feats li{background:rgba(255,255,255,.06);border:1.5px solid rgba(243,241,255,.35);border-radius:16px;padding:12px 14px;font-size:15px;color:var(--haze)}
+.mac-feats b{display:block;color:var(--moon);font-family:var(--display);font-size:18px}
+.mac-art{position:relative;z-index:1}
+.mac-art img{display:block;width:100%;border:3px solid var(--ink);border-radius:28px;box-shadow:12px 12px 0 #5EE6C1;transform:rotate(1.5deg)}
+.mac-art .stk{position:absolute;z-index:2;left:-18px;top:-22px;background:var(--lime);color:var(--ink);border:2px solid var(--ink);border-radius:10px;padding:6px 14px;font-weight:800;transform:rotate(-6deg);box-shadow:3px 3px 0 var(--ink)}
+.knobs a.kb{font:700 14px var(--sans);border:3px solid var(--ink);background:#fff;color:#16142B;border-radius:999px;padding:8px 14px;box-shadow:3px 3px 0 var(--ink)}
+.parade{grid-column:1/-1;display:block;width:100%;border-radius:28px;border:3px solid var(--ink);box-shadow:10px 10px 0 var(--pink)}
+@media (max-width:900px){.macsec{grid-template-columns:minmax(0,1fr);padding-block:80px}.mac-feats{grid-template-columns:minmax(0,1fr)}}
+@media (prefers-reduced-motion:reduce){.newmac{animation:none}}
 .knobs{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
 .knobs button{font:700 14px inherit;border:3px solid var(--ink,#16142B);background:#fff;color:#16142B;border-radius:999px;padding:8px 14px;cursor:pointer;box-shadow:3px 3px 0 var(--ink,#16142B)}
 .knobs button.on{background:#C6F432}.knobs button:active{transform:translate(2px,2px);box-shadow:1px 1px 0 var(--ink,#16142B)}
@@ -322,6 +343,7 @@ footer{background:var(--ink);color:#D9D7EA;padding-block:64px 40px;position:rela
 <header class="wrap" id="top">
   <a href="#top" class="logo" aria-label="Lazy-Monster home" style="display:flex;align-items:center;gap:10px"><img src="data:image/svg+xml;base64,PHN2ZyBpZD0ibG0iIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyIgdmlld0JveD0iMCAtMzAgNDAwIDM1MCIgZGF0YS1zdGF0ZT0ic2xlZXAiIHJvbGU9ImltZyIgYXJpYS1sYWJlbD0iTGF6eS1Nb25zdGVyIj4KPGRlZnM+CiA8bGluZWFyR3JhZGllbnQgaWQ9Im1iIiB4MT0iMCIgeTE9IjAiIHgyPSIwIiB5Mj0iMSI+PHN0b3Agb2Zmc2V0PSIwIiBzdG9wLWNvbG9yPSIjOTU3OUZGIi8+PHN0b3Agb2Zmc2V0PSIxIiBzdG9wLWNvbG9yPSIjNUIzREUwIi8+PC9saW5lYXJHcmFkaWVudD4KIDxsaW5lYXJHcmFkaWVudCBpZD0ibWgiIHgxPSIwIiB5MT0iMCIgeDI9IjAiIHkyPSIxIj48c3RvcCBvZmZzZXQ9IjAiIHN0b3AtY29sb3I9IiNEREZGNkEiLz48c3RvcCBvZmZzZXQ9IjEiIHN0b3AtY29sb3I9IiM5Q0NCMTIiLz48L2xpbmVhckdyYWRpZW50PgogPHJhZGlhbEdyYWRpZW50IGlkPSJnbG93IiBjeD0iLjUiIGN5PSIuNiIgcj0iLjUiPjxzdG9wIG9mZnNldD0iMCIgc3RvcC1jb2xvcj0iI0M2RjQzMiIgc3RvcC1vcGFjaXR5PSIuNTUiLz48c3RvcCBvZmZzZXQ9IjEiIHN0b3AtY29sb3I9IiNDNkY0MzIiIHN0b3Atb3BhY2l0eT0iMCIvPjwvcmFkaWFsR3JhZGllbnQ+CjwvZGVmcz4KPHN0eWxlPgogI2xtey0tbHZsOjA7b3ZlcmZsb3c6dmlzaWJsZX0KICNsbSAqe3RyYW5zZm9ybS1ib3g6ZmlsbC1ib3h9CiAuc2hhZG93e3RyYW5zZm9ybS1vcmlnaW46Y2VudGVyO2FuaW1hdGlvbjpzaGFkb3cgNC44cyBlYXNlLWluLW91dCBpbmZpbml0ZX0KIC5ib2R5e3RyYW5zZm9ybS1vcmlnaW46NTAlIDEwMCU7YW5pbWF0aW9uOmJyZWF0aGUgNC44cyBlYXNlLWluLW91dCBpbmZpbml0ZX0KIC5ob3JuTHt0cmFuc2Zvcm0tb3JpZ2luOjEwMCUgMTAwJTt0cmFuc2Zvcm06cm90YXRlKC0xNGRlZyk7dHJhbnNpdGlvbjp0cmFuc2Zvcm0gLjVzIGN1YmljLWJlemllciguMywxLjYsLjUsMSl9CiAuaG9yblJ7dHJhbnNmb3JtLW9yaWdpbjowJSAxMDAlO3RyYW5zZm9ybTpyb3RhdGUoMTRkZWcpO3RyYW5zaXRpb246dHJhbnNmb3JtIC41cyBjdWJpYy1iZXppZXIoLjMsMS42LC41LDEpfQogLnRhaWx7dHJhbnNmb3JtLW9yaWdpbjowJSA1MCU7YW5pbWF0aW9uOnRhaWwgMy4ycyBlYXNlLWluLW91dCBpbmZpbml0ZX0KIC56e29wYWNpdHk6MDthbmltYXRpb246eiAzLjZzIGVhc2UtaW4gaW5maW5pdGV9Lnoye2FuaW1hdGlvbi1kZWxheToxLjJzfS56M3thbmltYXRpb24tZGVsYXk6Mi40c30KIC5vcGVuLC5kb3RzLC5kb2MsLnNtaWxlLC5mcm93biwuaGFsbywudG9uZ3Vle29wYWNpdHk6MDt0cmFuc2l0aW9uOm9wYWNpdHkgLjI1c30KIC5jbG9zZWR7dHJhbnNpdGlvbjpvcGFjaXR5IC4yNXN9CiAub3BlbiAubGlke3RyYW5zZm9ybS1vcmlnaW46NTAlIDUwJTthbmltYXRpb246YmxpbmsgNS41cyBpbmZpbml0ZX0KIC5wdXBpbHt0cmFuc2l0aW9uOnRyYW5zZm9ybSAuNHN9CiAubW91dGh7dHJhbnNmb3JtLW9yaWdpbjo1MCUgNTAlO3RyYW5zaXRpb246dHJhbnNmb3JtIC4yc30KIC5jaGVla3t0cmFuc2l0aW9uOm9wYWNpdHkgLjRzfQogLmRvdHMgY2lyY2xle2FuaW1hdGlvbjpkb3QgMS4ycyBlYXNlLWluLW91dCBpbmZpbml0ZX0uZG90cyBjaXJjbGU6bnRoLWNoaWxkKDIpe2FuaW1hdGlvbi1kZWxheTouMTVzfS5kb3RzIGNpcmNsZTpudGgtY2hpbGQoMyl7YW5pbWF0aW9uLWRlbGF5Oi4zc30KIC5kb2N7dHJhbnNmb3JtLW9yaWdpbjo1MCUgMTAwJTthbmltYXRpb246Ym9iIDEuMXMgZWFzZS1pbi1vdXQgaW5maW5pdGV9CiAuaGFsb3t0cmFuc2Zvcm0tb3JpZ2luOmNlbnRlcn0KIC8qIGF3YWtlIHN0YXRlcyAqLwogI2xtOm5vdChbZGF0YS1zdGF0ZT1zbGVlcF0pIC5jbG9zZWR7b3BhY2l0eTowfQogI2xtOm5vdChbZGF0YS1zdGF0ZT1zbGVlcF0pIC5vcGVue29wYWNpdHk6MX0KICNsbTpub3QoW2RhdGEtc3RhdGU9c2xlZXBdKSAuenthbmltYXRpb246bm9uZTtvcGFjaXR5OjB9CiAjbG06bm90KFtkYXRhLXN0YXRlPXNsZWVwXSkgLmhvcm5Me3RyYW5zZm9ybTpyb3RhdGUoMCl9CiAjbG06bm90KFtkYXRhLXN0YXRlPXNsZWVwXSkgLmhvcm5Se3RyYW5zZm9ybTpyb3RhdGUoMCl9CiAjbG06bm90KFtkYXRhLXN0YXRlPXNsZWVwXSkgLmJvZHl7YW5pbWF0aW9uLWR1cmF0aW9uOjIuNnN9CiAjbG1bZGF0YS1zdGF0ZT1saXN0ZW5dIC5ib2R5e2FuaW1hdGlvbjp0aWx0IDIuNHMgZWFzZS1pbi1vdXQgaW5maW5pdGV9CiAjbG1bZGF0YS1zdGF0ZT1saXN0ZW5dIC5oYWxve29wYWNpdHk6Y2FsYyguMzUgKyB2YXIoLS1sdmwpICogLjY1KTt0cmFuc2Zvcm06c2NhbGUoY2FsYygxICsgdmFyKC0tbHZsKSAqIC4yNSkpfQogI2xtW2RhdGEtc3RhdGU9dGhpbmtdIC5kb3Rze29wYWNpdHk6MX0KICNsbVtkYXRhLXN0YXRlPXRoaW5rXSAucHVwaWx7dHJhbnNmb3JtOnRyYW5zbGF0ZSg2cHgsLTdweCl9CiAjbG1bZGF0YS1zdGF0ZT1hY3RdIC5kb2MsI2xtW2RhdGEtc3RhdGU9YWN0XSAudG9uZ3Vle29wYWNpdHk6MX0KICNsbVtkYXRhLXN0YXRlPWFjdF0gLnB1cGlse3RyYW5zZm9ybTp0cmFuc2xhdGUoNHB4LDVweCl9CiAjbG1bZGF0YS1zdGF0ZT1zcGVha10gLm1vdXRoe2FuaW1hdGlvbjp0YWxrIC4yOHMgZWFzZS1pbi1vdXQgaW5maW5pdGUgYWx0ZXJuYXRlfQogI2xtW2RhdGEtc3RhdGU9YXNrXSAucHVwaWx7dHJhbnNmb3JtOnRyYW5zbGF0ZSgtNXB4LC00cHgpfQogI2xtW2RhdGEtc3RhdGU9YXNrXSAuaG9ybkx7dHJhbnNmb3JtOnJvdGF0ZSgtOGRlZyl9CiAjbG1bZGF0YS1zdGF0ZT1kb25lXSAuc21pbGV7b3BhY2l0eToxfSNsbVtkYXRhLXN0YXRlPWRvbmVdIC5tb3V0aHtvcGFjaXR5OjB9CiAjbG1bZGF0YS1zdGF0ZT1kb25lXSAuY2hlZWt7b3BhY2l0eTouODV9CiAjbG1bZGF0YS1zdGF0ZT1kb25lXSAuYm9keXthbmltYXRpb246aG9wIC43cyBjdWJpYy1iZXppZXIoLjMsMS40LC41LDEpIDJ9CiAjbG1bZGF0YS1zdGF0ZT1lcnJvcl0gLmZyb3due29wYWNpdHk6MX0jbG1bZGF0YS1zdGF0ZT1lcnJvcl0gLm1vdXRoe29wYWNpdHk6MH0KICNsbVtkYXRhLXN0YXRlPWVycm9yXSAuYm9keXthbmltYXRpb246c2hha2UgLjQ1cyBlYXNlLWluLW91dCAyfQogQGtleWZyYW1lcyBicmVhdGhlezAlLDEwMCV7dHJhbnNmb3JtOnNjYWxlKDEsMSl9NTAle3RyYW5zZm9ybTpzY2FsZSgxLjAyNSwuOTc1KX19CiBAa2V5ZnJhbWVzIHNoYWRvd3swJSwxMDAle3RyYW5zZm9ybTpzY2FsZVgoMSl9NTAle3RyYW5zZm9ybTpzY2FsZVgoMS4wNCl9fQogQGtleWZyYW1lcyB0YWlsezAlLDEwMCV7dHJhbnNmb3JtOnJvdGF0ZSgwKX01MCV7dHJhbnNmb3JtOnJvdGF0ZSgtMTJkZWcpfX0KIEBrZXlmcmFtZXMgenswJXtvcGFjaXR5OjA7dHJhbnNmb3JtOnRyYW5zbGF0ZSgwLDEwcHgpIHNjYWxlKC42KX0yNSV7b3BhY2l0eToxfTEwMCV7b3BhY2l0eTowO3RyYW5zZm9ybTp0cmFuc2xhdGUoMjRweCwtNDBweCkgc2NhbGUoMS4xKX19CiBAa2V5ZnJhbWVzIGJsaW5rezAlLDk0JSwxMDAle3RyYW5zZm9ybTpzY2FsZVkoMSl9OTYle3RyYW5zZm9ybTpzY2FsZVkoLjA4KX19CiBAa2V5ZnJhbWVzIGRvdHswJSwxMDAle3RyYW5zZm9ybTp0cmFuc2xhdGVZKDApO29wYWNpdHk6LjV9NTAle3RyYW5zZm9ybTp0cmFuc2xhdGVZKC04cHgpO29wYWNpdHk6MX19CiBAa2V5ZnJhbWVzIGJvYnswJSwxMDAle3RyYW5zZm9ybTp0cmFuc2xhdGVZKDApIHJvdGF0ZSgtNGRlZyl9NTAle3RyYW5zZm9ybTp0cmFuc2xhdGVZKC02cHgpIHJvdGF0ZSg0ZGVnKX19CiBAa2V5ZnJhbWVzIHRhbGt7ZnJvbXt0cmFuc2Zvcm06c2NhbGUoMSwuNSl9dG97dHJhbnNmb3JtOnNjYWxlKDEuMDUsMS4zNSl9fQogQGtleWZyYW1lcyB0aWx0ezAlLDEwMCV7dHJhbnNmb3JtOnJvdGF0ZSgtM2RlZyl9NTAle3RyYW5zZm9ybTpyb3RhdGUoM2RlZyl9fQogQGtleWZyYW1lcyBob3B7MCUsMTAwJXt0cmFuc2Zvcm06dHJhbnNsYXRlWSgwKX00MCV7dHJhbnNmb3JtOnRyYW5zbGF0ZVkoLTE2cHgpIHNjYWxlKDEuMDMsLjk3KX19CiBAa2V5ZnJhbWVzIHNoYWtlezAlLDEwMCV7dHJhbnNmb3JtOnRyYW5zbGF0ZVgoMCl9MjUle3RyYW5zZm9ybTp0cmFuc2xhdGVYKC04cHgpfTc1JXt0cmFuc2Zvcm06dHJhbnNsYXRlWCg4cHgpfX0KICNsbSAuY2xvc2Vke2FuaW1hdGlvbjpwZWVrYyA5cyBpbmZpbml0ZX0jbG0gLm9wZW57YW5pbWF0aW9uOnBlZWtvIDlzIGluZmluaXRlfQogI2xtIC5vcGVuIC5saWR7YW5pbWF0aW9uOm5vbmV9CiBAa2V5ZnJhbWVzIHBlZWtjezAlLDcwJSw4MiUsMTAwJXtvcGFjaXR5OjF9NzIlLDgwJXtvcGFjaXR5OjB9fQogQGtleWZyYW1lcyBwZWVrb3swJSw3MCUsODIlLDEwMCV7b3BhY2l0eTowfTcyJSw4MCV7b3BhY2l0eToxfX0KIEBtZWRpYSAocHJlZmVycy1yZWR1Y2VkLW1vdGlvbjpyZWR1Y2UpeyNsbSAqe2FuaW1hdGlvbjpub25lIWltcG9ydGFudH19Cjwvc3R5bGU+CjxlbGxpcHNlIGNsYXNzPSJoYWxvIiBjeD0iMjAwIiBjeT0iMTkwIiByeD0iMTkwIiByeT0iMTYwIiBmaWxsPSJ1cmwoI2dsb3cpIi8+CjxlbGxpcHNlIGNsYXNzPSJzaGFkb3ciIGN4PSIyMDAiIGN5PSIyOTIiIHJ4PSIxNTAiIHJ5PSIxMyIgZmlsbD0iIzAwMCIgb3BhY2l0eT0iLjIyIi8+CjxnIGNsYXNzPSJib2R5Ij4KIDxwYXRoIGNsYXNzPSJob3JuTCIgZD0iTTEzMSwxMDQgTDExOCw1MiBRMTE2LDQ0IDEyNCw0NyBMMTY2LDkwIFoiIGZpbGw9InVybCgjbWgpIi8+CiA8cGF0aCBjbGFzcz0iaG9yblIiIGQ9Ik0yNjksMTA0IEwyODIsNTIgUTI4NCw0NCAyNzYsNDcgTDIzNCw5MCBaIiBmaWxsPSJ1cmwoI21oKSIvPgogPHBhdGggY2xhc3M9InRhaWwiIGQ9Ik0zMTIsMjEwIHEzMCwtNiAzOCwyMiIgc3Ryb2tlPSIjNUIzREUwIiBzdHJva2Utd2lkdGg9IjE4IiBmaWxsPSJub25lIiBzdHJva2UtbGluZWNhcD0icm91bmQiLz4KIDxwYXRoIGQ9Ik02NiwyNjIgQzU4LDE2OCAxMTIsODYgMjAwLDg2IEMyODgsODYgMzQyLDE2OCAzMzQsMjYyIFEzMzIsMjg0IDMxMCwyODQgTDkwLDI4NCBRNjgsMjg0IDY2LDI2MiBaIiBmaWxsPSJ1cmwoI21iKSIvPgogPHBhdGggZD0iTTkyLDE1MCBDMTEwLDExMiAxNTAsOTYgMTg2LDk0IiBzdHJva2U9IiNmZmYiIHN0cm9rZS1vcGFjaXR5PSIuMjgiIHN0cm9rZS13aWR0aD0iOSIgZmlsbD0ibm9uZSIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIi8+CiA8ZWxsaXBzZSBjeD0iMjAwIiBjeT0iMjM2IiByeD0iOTIiIHJ5PSI0MCIgZmlsbD0iI0IzQTJGRiIgb3BhY2l0eT0iLjM1Ii8+CiA8ZyBjbGFzcz0iY2xvc2VkIj4KICA8cGF0aCBkPSJNMTM0LDE3MiBxMjIsMTYgNDQsMCIgc3Ryb2tlPSIjMEQxMTE3IiBzdHJva2Utd2lkdGg9IjgiIGZpbGw9Im5vbmUiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIvPgogIDxwYXRoIGQ9Ik0yMjIsMTcyIHEyMiwxNiA0NCwwIiBzdHJva2U9IiMwRDExMTciIHN0cm9rZS13aWR0aD0iOCIgZmlsbD0ibm9uZSIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIi8+CiAgPHBhdGggZD0iTTE0MCwxNjAgcTE2LC04IDMyLC0yIiBzdHJva2U9IiMwRDExMTciIHN0cm9rZS1vcGFjaXR5PSIuMzUiIHN0cm9rZS13aWR0aD0iNSIgZmlsbD0ibm9uZSIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIi8+CiAgPHBhdGggZD0iTTIyOCwxNTggcTE2LC02IDMyLDIiIHN0cm9rZT0iIzBEMTExNyIgc3Ryb2tlLW9wYWNpdHk9Ii4zNSIgc3Ryb2tlLXdpZHRoPSI1IiBmaWxsPSJub25lIiBzdHJva2UtbGluZWNhcD0icm91bmQiLz4KIDwvZz4KIDxnIGNsYXNzPSJvcGVuIj4KICA8ZyBjbGFzcz0ibGlkIj48ZWxsaXBzZSBjeD0iMTU2IiBjeT0iMTcwIiByeD0iMjEiIHJ5PSIyMyIgZmlsbD0iI2ZmZiIvPjxlbGxpcHNlIGN4PSIyNDQiIGN5PSIxNzAiIHJ4PSIyMSIgcnk9IjIzIiBmaWxsPSIjZmZmIi8+PC9nPgogIDxnIGNsYXNzPSJwdXBpbCI+PGNpcmNsZSBjeD0iMTU4IiBjeT0iMTc0IiByPSIxMCIgZmlsbD0iIzBEMTExNyIvPjxjaXJjbGUgY3g9IjI0NiIgY3k9IjE3NCIgcj0iMTAiIGZpbGw9IiMwRDExMTciLz4KICAgPGNpcmNsZSBjeD0iMTYxIiBjeT0iMTcwIiByPSIzLjUiIGZpbGw9IiNmZmYiLz48Y2lyY2xlIGN4PSIyNDkiIGN5PSIxNzAiIHI9IjMuNSIgZmlsbD0iI2ZmZiIvPjwvZz4KIDwvZz4KIDxjaXJjbGUgY2xhc3M9ImNoZWVrIiBjeD0iMTI4IiBjeT0iMTk4IiByPSIxMiIgZmlsbD0iI0ZGOEZCOCIgb3BhY2l0eT0iLjQ1Ii8+PGNpcmNsZSBjbGFzcz0iY2hlZWsiIGN4PSIyNzIiIGN5PSIxOTgiIHI9IjEyIiBmaWxsPSIjRkY4RkI4IiBvcGFjaXR5PSIuNDUiLz4KIDxnIGNsYXNzPSJtb3V0aCI+PGVsbGlwc2UgY3g9IjIwMCIgY3k9IjIxMCIgcng9IjE1IiByeT0iMTEiIGZpbGw9IiMyMjEwNUUiLz48ZWxsaXBzZSBjeD0iMjAwIiBjeT0iMjE0IiByeD0iOCIgcnk9IjQiIGZpbGw9IiNGRjdGQTgiIG9wYWNpdHk9Ii44Ii8+PC9nPgogPHBhdGggY2xhc3M9InRvbmd1ZSIgZD0iTTIwNiwyMTQgcTYsMTQgMTQsNCIgZmlsbD0iI0ZGN0ZBOCIvPgogPHBhdGggY2xhc3M9InNtaWxlIiBkPSJNMTgwLDIwNCBxMjAsMjAgNDAsMCIgc3Ryb2tlPSIjMjIxMDVFIiBzdHJva2Utd2lkdGg9IjciIGZpbGw9Im5vbmUiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIvPgogPHBhdGggY2xhc3M9ImZyb3duIiBkPSJNMTgyLDIxNiBxMTgsLTE0IDM2LDAiIHN0cm9rZT0iIzIyMTA1RSIgc3Ryb2tlLXdpZHRoPSI3IiBmaWxsPSJub25lIiBzdHJva2UtbGluZWNhcD0icm91bmQiLz4KIDxyZWN0IHg9Ijk2IiB5PSIyNjIiIHdpZHRoPSI1OCIgaGVpZ2h0PSIyNiIgcng9IjEzIiBmaWxsPSIjNUIzREUwIi8+PHJlY3QgeD0iMjQ2IiB5PSIyNjIiIHdpZHRoPSI1OCIgaGVpZ2h0PSIyNiIgcng9IjEzIiBmaWxsPSIjNUIzREUwIi8+CiA8ZyBjbGFzcz0iZG9jIj48cmVjdCB4PSIzMDAiIHk9IjIyOCIgd2lkdGg9IjQ0IiBoZWlnaHQ9IjU0IiByeD0iNiIgZmlsbD0iI0YzRjFGRiIvPjxyZWN0IHg9IjMwOCIgeT0iMjQwIiB3aWR0aD0iMjgiIGhlaWdodD0iNCIgcng9IjIiIGZpbGw9IiM3QzVDRkYiLz4KICA8cmVjdCB4PSIzMDgiIHk9IjI1MCIgd2lkdGg9IjIyIiBoZWlnaHQ9IjQiIHJ4PSIyIiBmaWxsPSIjN0M1Q0ZGIi8+PHJlY3QgeD0iMzA4IiB5PSIyNjAiIHdpZHRoPSIyNiIgaGVpZ2h0PSI0IiByeD0iMiIgZmlsbD0iI0M2RjQzMiIvPjwvZz4KPC9nPgo8ZyBjbGFzcz0iZG90cyIgZmlsbD0iI0M2RjQzMiI+PGNpcmNsZSBjeD0iMTc2IiBjeT0iMzgiIHI9IjgiLz48Y2lyY2xlIGN4PSIyMDAiIGN5PSIzOCIgcj0iOCIvPjxjaXJjbGUgY3g9IjIyNCIgY3k9IjM4IiByPSI4Ii8+PC9nPgo8ZyBmb250LWZhbWlseT0iU0csJ1NwYWNlIEdyb3Rlc2snLHNhbnMtc2VyaWYiIGZvbnQtd2VpZ2h0PSI3MDAiIGZpbGw9IiNDNkY0MzIiPgogPHRleHQgY2xhc3M9InoiIHg9IjMwMCIgeT0iMTAwIiBmb250LXNpemU9IjMwIj56PC90ZXh0Pjx0ZXh0IGNsYXNzPSJ6IHoyIiB4PSIzMjYiIHk9IjcwIiBmb250LXNpemU9IjQwIj56PC90ZXh0Pjx0ZXh0IGNsYXNzPSJ6IHozIiB4PSIzNTIiIHk9IjM2IiBmb250LXNpemU9IjUyIj56PC90ZXh0Pgo8L2c+Cjwvc3ZnPgo=" alt="" width="46" height="40" style="display:block"><span><b>lazy</b>monster</span></a>
   <nav aria-label="Main">
+    <a href="#mac" class="navmac">Mac <i>new</i></a>
     <a href="#how">How it works</a>
     <a href="#local">Runs on your PC</a>
     <a href="#safe">Safety</a>
@@ -342,8 +364,9 @@ footer{background:var(--ink);color:#D9D7EA;padding-block:64px 40px;position:rela
   <section class="hero wrap">
     <div class="hero-copy">
       <div class="live"><i></i>Listening for "Hey Monster"</div>
+      <a href="#mac" class="newmac">Now on macOS <b>Apple Silicon</b></a>
       <h1 class="glitch" data-text="Say it. The monster does it.">Say it. The monster does it.</h1>
-      <p class="lede">A voice agent that lives on your AI PC. It hears you on the NPU, thinks on the GPU, talks on the CPU, drives your real apps, and keeps working when the Wi-Fi dies.</p>
+      <p class="lede">A voice agent that lives on your AI PC, and now your Mac. It hears you on the NPU, thinks on the GPU, talks on the CPU, drives your real apps, and keeps working when the Wi-Fi dies.</p>
       <form class="say" id="sayForm">
         <label class="field">
           <span class="sr">Try a request</span>
@@ -537,7 +560,7 @@ footer{background:var(--ink);color:#D9D7EA;padding-block:64px 40px;position:rela
         <div class="knob-l">Mood</div>
         <div class="knobs" id="moods"><button data-s="sleep" class="on">Asleep</button><button data-s="listen">Listening</button><button data-s="think">Thinking</button><button data-s="speak">Talking</button><button data-s="done">Done</button><button data-s="error">Nope</button></div>
         <div class="knob-l">Transform</div>
-        <div class="knobs"><button id="morph" style="background:#FF5FA2;color:#fff">Become the monster</button><button id="brk">Brain-Break (offline)</button></div>
+        <div class="knobs"><button id="morph" style="background:#FF5FA2;color:#fff">Become the monster</button><button id="brk">Brain-Break (offline)</button><button id="party" style="background:#5EE6C1">Party mode</button></div>
         <div class="knob-l">Skin</div>
         <div class="knobs" id="skins"><button data-k="classic" class="on">Classic</button><button data-k="mint">Mint</button><button data-k="sunset">Sunset</button><button data-k="midnight">Midnight</button><button data-k="bubblegum">Bubblegum</button></div>
         <div class="knob-l">Outfit</div>
@@ -545,11 +568,31 @@ footer{background:var(--ink);color:#D9D7EA;padding-block:64px 40px;position:rela
       </div>
     </div>
   </section>
-  <section class="wrap" id="film" data-buddy="think" data-line="40 seconds. Turn the sound up." style="padding-top:30px">
-    <span class="eyebrow">The film</span>
-    <h2 class="h2">40 seconds. Sound on.</h2>
-    <div class="knobs" style="margin:14px 0 18px"><button id="v169" class="on">Landscape</button><button id="v916">Vertical</button></div>
-    <div class="vid" id="vidbox"><video id="vid" controls playsinline preload="metadata" src="media/lazy-monster-16x9.mp4"></video><div class="novid">The film plays on lazymonster.space.</div></div>
+  <section class="wrap" id="film" data-buddy="think" data-line="Turn the sound up. Punk is loud on purpose." style="padding-top:30px">
+    <span class="eyebrow">The films</span>
+    <h2 class="h2">Sound on.</h2>
+    <div class="knobs" style="margin:14px 0 18px"><button id="vmac" class="on">Now on macOS</button><button id="v169">The original</button><button id="v916">Vertical</button></div>
+    <div class="vid" id="vidbox"><video id="vid" controls playsinline preload="metadata" poster="media/lazy-monster-macos-poster.jpg" src="media/lazy-monster-macos-16x9.mp4"></video><div class="novid">The film plays on lazymonster.space.</div></div>
+  </section>
+
+  <section class="macsec wrap" id="mac" data-buddy="listen" data-line="Mac people. Come on in.">
+    <div class="mac-copy">
+      <span class="eyebrow" style="color:#5EE6C1">New · Apple Silicon</span>
+      <h2 class="h2">Now on your <span>Mac.</span></h2>
+      <p class="lede" style="max-width:44ch">Same monster, native Mac brain. It hears you and handles quick requests on the Apple GPU with MLX, reads your screen with Apple's Vision framework, and keeps your keys in the Keychain.</p>
+      <div class="mac-pills"><span>M1</span><span>M2</span><span>M3</span><span>M4</span><span>macOS 13+</span><span>no admin</span></div>
+      <ul class="mac-feats">
+        <li><b>Its own app</b>Lazy-Monster.app, so every permission is one Allow and says Lazy-Monster, not Python.</li>
+        <li><b>Brings its own Python</b>No Python on the Mac? The installer sets one up just for the monster.</li>
+        <li><b>Quick brain on MLX</b>Simple requests stay on your Mac, offline.</li>
+        <li><b>Same skins and moods</b>Classic, mint, sunset, midnight, bubblegum. Shades optional.</li>
+      </ul>
+      <div class="cmdrow" style="box-shadow:6px 6px 0 #5EE6C1"><div class="top"><strong>Paste into Terminal</strong><button class="copy" type="button">Copy</button></div>
+        <code>curl -fsSL https://raw.githubusercontent.com/AndySync-09/Lazy-Monster/apple/install.sh | bash</code></div>
+      <div class="knobs" style="margin-top:0"><button id="macFilm" style="background:#5EE6C1">Watch the Mac film</button><a class="kb" href="https://github.com/AndySync-09/Lazy-Monster/tree/apple" target="_blank" rel="noopener">The apple branch</a></div>
+    </div>
+    <div class="mac-art"><span class="stk">Apple Silicon</span><img src="assets/readme/edition-mac.svg" alt="An Apple Silicon chip with the monster in shades on top; MLX on the GPU hears you and runs the quick brain, Apple Vision reads your screen, the Keychain keeps your keys" loading="lazy"></div>
+    <img class="parade" src="assets/readme/moods.svg" alt="Six moods in five skins: sleep, listen, think, act, speak, done" loading="lazy">
   </section>
   <section class="how wrap" id="how" data-buddy="listen" data-line="This is me listening. Pauses are fine.">
     <div class="split-head">
@@ -675,7 +718,7 @@ footer{background:var(--ink);color:#D9D7EA;padding-block:64px 40px;position:rela
         </ol>
       </div>
       <div class="cmdrow" style="box-shadow:6px 6px 0 var(--pink)"><div class="top"><strong>Also on Apple Silicon</strong><span class="small" style="color:var(--body)">M1 to M4 · macOS 13+ · preview</span></div>
-        <p style="color:var(--body);margin:0 0 10px">The same monster for Macs: Whisper and the quick brain on the Apple GPU with MLX, screen reading with Apple's Vision framework on the Neural Engine. It lives on the <a href="https://github.com/AndySync-09/Lazy-Monster/tree/apple" style="text-decoration:underline">apple branch</a>. Paste into Terminal:</p>
+        <p style="color:var(--body);margin:0 0 10px">The same monster for Macs: Whisper and the quick brain on the Apple GPU with MLX, screen reading with Apple's Vision framework, and its own Lazy-Monster.app so permissions are one Allow each. It lives on the <a href="https://github.com/AndySync-09/Lazy-Monster/tree/apple" style="text-decoration:underline">apple branch</a>. Paste into Terminal:</p>
         <code>curl -fsSL https://raw.githubusercontent.com/AndySync-09/Lazy-Monster/apple/install.sh | bash</code></div>
       <details class="cmdrow" style="box-shadow:6px 6px 0 var(--sky)"><summary style="cursor:pointer;font-family:var(--display);font-weight:700;font-size:18px">Prefer to read the script first?</summary>
         <p style="color:var(--body);margin-top:8px">Good habit. Windows: <a href="https://github.com/AndySync-09/lazy-monster/blob/main/install.ps1" style="text-decoration:underline">install.ps1</a>. Mac: <a href="https://github.com/AndySync-09/Lazy-Monster/blob/apple/install.sh" style="text-decoration:underline">install.sh on the apple branch</a>. Or open <a href="https://github.com/AndySync-09/lazy-monster/blob/main/install.ps1" style="text-decoration:underline">install.ps1 on GitHub</a>, or download it and run it yourself. To remove everything later, run <b>uninstall.ps1</b> from the install folder.</p>
@@ -713,7 +756,7 @@ footer{background:var(--ink);color:#D9D7EA;padding-block:64px 40px;position:rela
       <details><summary>Can it remind me?</summary><p>Yes. "Remind me about the cafe meeting at 8 AM" and at 8 the monster wakes up on its own, tells you, and suggests what it could do next, like opening the project or drafting an email. It always asks first.</p></details>
       <details><summary>How do I update or remove it?</summary><p>Run the install command again, or say "monster update" in a terminal. To remove it, run uninstall.ps1 from %LOCALAPPDATA%\LazyMonster\app. It asks before deleting your voice and settings.</p></details>
       <details><summary>Do I need an NPU?</summary><p>No. With an Intel AI PC the wake word runs on the NPU and saves battery. Without one, it runs on the CPU.</p></details>
-      <details><summary>Does it work on a Mac?</summary><p>Yes, on Apple Silicon (M1 to M4), as a preview. It lives on the apple branch: Whisper and the quick brain run on the Apple GPU with MLX, and screen reading uses Apple's Vision framework. Install it with the Apple Silicon tab above.</p></details>
+      <details><summary>Does it work on a Mac?</summary><p>Yes, on Apple Silicon (M1 to M4), as a preview. It lives on the apple branch: Whisper and the quick brain run on the Apple GPU with MLX, screen reading uses Apple's Vision framework, and it installs as its own Lazy-Monster.app, bringing its own Python if your Mac has none. See <a href="#mac" style="text-decoration:underline">Now on your Mac</a>.</p></details>
       <details><summary>Can it delete my files?</summary><p>No. There is no delete, no terminal, no sending and no buying. It writes new files in its own folder and asks before anything risky.</p></details>
       <details><summary>What if someone else says "Hey Monster"?</summary><p>With the voice lock on, it ignores voices that aren't yours. Typed requests and push-to-talk always work for you.</p></details>
     </div>
@@ -1116,9 +1159,19 @@ footer{background:var(--ink);color:#D9D7EA;padding-block:64px 40px;position:rela
  // film switcher
  const v=document.getElementById('vid'),box=document.getElementById('vidbox');
  v.addEventListener('error',()=>{v.style.display='none';box.querySelector('.novid').style.display='block';});
- document.getElementById('v169').onclick=()=>{v.src='media/lazy-monster-16x9.mp4';box.classList.remove('tall');set2('v169');};
- document.getElementById('v916').onclick=()=>{v.src='media/lazy-monster-9x16.mp4';box.classList.add('tall');set2('v916');};
- function set2(id){['v169','v916'].forEach(k=>document.getElementById(k).classList.toggle('on',k===id));}
+ const film=(id,src,tall,poster)=>{v.poster=poster||'';v.src=src;box.classList.toggle('tall',!!tall);set2(id);};
+ document.getElementById('vmac').onclick=()=>film('vmac','media/lazy-monster-macos-16x9.mp4',0,'media/lazy-monster-macos-poster.jpg');
+ document.getElementById('v169').onclick=()=>film('v169','media/lazy-monster-16x9.mp4');
+ document.getElementById('v916').onclick=()=>film('v916','media/lazy-monster-9x16.mp4',1);
+ document.getElementById('macFilm').onclick=()=>{film('vmac','media/lazy-monster-macos-16x9.mp4',0,'media/lazy-monster-macos-poster.jpg');document.getElementById('film').scrollIntoView({behavior:'smooth'});setTimeout(()=>{v.play().catch(()=>{});},700);};
+ function set2(id){['vmac','v169','v916'].forEach(k=>document.getElementById(k).classList.toggle('on',k===id));}
+ // party mode: skins, outfits and moods on the beat
+ let party=null;document.getElementById('party').onclick=e=>{if(party){clearInterval(party);party=null;e.target.classList.remove('on');e.target.textContent='Party mode';return;}
+  const S=['classic','mint','sunset','midnight','bubblegum'],O=['shades','party','cricket','diwali','santa',''],M=['listen','speak','done','think','speak','done'];let i=0;
+  e.target.classList.add('on');e.target.textContent='Stop the party';
+  party=setInterval(()=>{const k=S[i%5],o=O[i%6],md=M[i%6];m.setAttribute('data-skin',k);m.setAttribute('data-outfit',o);m.setAttribute('data-state',md);set('skins','k',k);set('outfits','o',o);set('moods','s',md);
+   pen.animate([{transform:'scale(1) rotate(0)'},{transform:'scale(1.06) rotate(-2deg)'},{transform:'scale(1) rotate(0)'}],{duration:380,easing:'cubic-bezier(.3,1.6,.5,1)'});
+   if(++i>=30){clearInterval(party);party=null;e.target.classList.remove('on');e.target.textContent='Party mode';}},560);};
 })();
 </script>
 

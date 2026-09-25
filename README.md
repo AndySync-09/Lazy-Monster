@@ -1,33 +1,68 @@
 <p align="center">
-  <img alt="The Lazy-Monster mascot, asleep, peeking now and then" src="docs/assets/brand/mascot-animated.svg" width="170"><br>
+  <a href="https://lazymonster.space"><img src="docs/assets/readme/hero.svg" width="100%" alt="Five Lazy-Monsters in five skins and moods on a stage. Now on Windows AI PCs and on macOS with Apple Silicon."></a>
+</p>
+
+<p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="docs/assets/brand/wordmark-dark.png">
     <source media="(prefers-color-scheme: light)" srcset="docs/assets/brand/wordmark-light.png">
-    <img alt="Lazy-Monster" src="docs/assets/brand/wordmark-dark.png" width="420">
+    <img alt="Lazy-Monster" src="docs/assets/brand/wordmark-dark.png" width="340">
   </picture>
 </p>
 
-<h3 align="center">Say it. The monster does it.</h3>
-
 <p align="center">
-  A voice agent that lives on your Windows AI PC. It hears you on the NPU, thinks on the GPU,<br>
-  talks on the CPU, drives your real apps, and keeps working when the Wi-Fi dies.
+  A voice agent that lives on your computer. On a Windows AI PC it hears you on the NPU, thinks on the GPU and talks on the CPU.<br>
+  On a Mac with Apple Silicon it runs on MLX and Apple's Vision framework. Either way it drives your real apps and keeps working when the Wi-Fi dies.
 </p>
 
 <p align="center">
   <a href="LICENSE"><img alt="License" src="https://img.shields.io/badge/license-Apache%202.0-7C5CFF?style=for-the-badge&labelColor=0D0A1F"></a>
-  <img alt="Windows 10 and 11" src="https://img.shields.io/badge/windows-10%20%7C%2011-9DB8FF?style=for-the-badge&labelColor=0D0A1F">
+  <a href="#install"><img alt="Windows 10 and 11" src="https://img.shields.io/badge/windows-10%20%7C%2011-9DB8FF?style=for-the-badge&labelColor=0D0A1F"></a>
+  <a href="#on-a-mac-with-apple-silicon"><img alt="macOS on Apple Silicon" src="https://img.shields.io/badge/macOS-apple%20silicon-5EE6C1?style=for-the-badge&labelColor=0D0A1F"></a>
   <img alt="Intel AI PC" src="https://img.shields.io/badge/NPU%20%2B%20GPU%20%2B%20CPU-hybrid-C6F432?style=for-the-badge&labelColor=0D0A1F">
   <img alt="Works offline" src="https://img.shields.io/badge/offline-Brain--Break-F5C451?style=for-the-badge&labelColor=0D0A1F">
   <img alt="No telemetry" src="https://img.shields.io/badge/telemetry-none-FF5FA2?style=for-the-badge&labelColor=0D0A1F">
 </p>
 
 <p align="center">
+  <a href="#pick-your-monster"><b>Windows or Mac</b></a> &nbsp;·&nbsp;
   <a href="#install"><b>Install in one line</b></a> &nbsp;·&nbsp;
   <a href="#three-engines-one-monster"><b>How it thinks</b></a> &nbsp;·&nbsp;
   <a href="#brain-break"><b>Brain-Break</b></a> &nbsp;·&nbsp;
-  <a href="#models-that-ship"><b>Models</b></a> &nbsp;·&nbsp;
+  <a href="#skins-moods-and-outfits"><b>Skins and moods</b></a> &nbsp;·&nbsp;
   <a href="https://lazymonster.space"><b>lazymonster.space</b></a>
+</p>
+
+## Pick your monster
+
+<table>
+<tr>
+<td width="50%" valign="top">
+<img src="docs/assets/readme/edition-windows.svg" width="100%" alt="Windows edition: an Intel AI PC chip; the NPU runs the wake word and reads screens, the GPU hears you and runs the quick brain, the CPU is the voice">
+
+<img src="docs/assets/readme/icons/desktop.svg" width="30" align="left">&nbsp;<b>Windows 10 and 11</b>, best on an Intel AI PC. The flagship, on this branch.
+
+```powershell
+irm https://raw.githubusercontent.com/AndySync-09/lazy-monster/main/install.ps1 | iex
+```
+</td>
+<td width="50%" valign="top">
+<img src="docs/assets/readme/edition-mac.svg" width="100%" alt="Mac edition: an Apple Silicon chip; MLX on the GPU hears you and runs the quick brain, Apple Vision reads your screen, the Keychain keeps your keys">
+
+<img src="docs/assets/readme/icons/laptop.svg" width="30" align="left">&nbsp;<b>macOS on Apple Silicon</b>, M1 to M4. Lives on the <a href="https://github.com/AndySync-09/Lazy-Monster/tree/apple"><code>apple</code></a> branch.
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/AndySync-09/Lazy-Monster/apple/install.sh | bash
+```
+</td>
+</tr>
+</table>
+
+### New: now on macOS
+
+<p align="center">
+  <a href="https://lazymonster.space/#film"><img src="docs/assets/readme/macos-teaser.gif" width="720" alt="Teaser: the monster drops onto an Apple Silicon chip, then parades its five skins"></a><br>
+  <img src="docs/assets/readme/icons/play.svg" width="22" align="absmiddle">&nbsp;<a href="https://lazymonster.space/#film"><b>Watch the 38-second film with sound</b></a>
 </p>
 
 <!-- Demo video: drag docs/media/lazy-monster-16x9.mp4 into this README in GitHub's editor and paste the
@@ -131,11 +166,21 @@ Update by running the same command. Remove with `uninstall.ps1` in `%LOCALAPPDAT
 
 ### On a Mac with Apple Silicon
 
-The Mac edition lives on the [`apple`](https://github.com/AndySync-09/Lazy-Monster/tree/apple) branch (preview): Whisper and the quick brain on the Apple GPU with MLX, screen reading with Apple's Vision framework. One command in Terminal:
+<img src="docs/assets/readme/icons/silicon.svg" width="44" align="right">
+
+The Mac edition lives on the [`apple`](https://github.com/AndySync-09/Lazy-Monster/tree/apple) branch (preview). One command in Terminal, no admin password:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/AndySync-09/Lazy-Monster/apple/install.sh | bash
 ```
+
+| | On a Mac |
+|---|---|
+| <img src="docs/assets/readme/icons/gpu.svg" width="26"> | Whisper and the quick brain on the Apple GPU with MLX |
+| <img src="docs/assets/readme/icons/eye.svg" width="26"> | Screen reading with Apple's Vision framework, built into macOS |
+| <img src="docs/assets/readme/icons/key.svg" width="26"> | API keys in your Keychain |
+| <img src="docs/assets/readme/icons/app.svg" width="26"> | Its own Lazy-Monster.app, so every permission is one "Allow", and it's named Lazy-Monster, not Python |
+| <img src="docs/assets/readme/icons/bolt.svg" width="26"> | No Python on the Mac? The installer brings its own, just for the monster |
 
 ## It won't
 
@@ -163,13 +208,19 @@ Details: [SECURITY.md](SECURITY.md).
 | `monster service status` / `start` / `stop` | The background monster (restarts itself after a crash) |
 | `monster crashes` | The latest crash report, if there ever is one |
 
-## The fun part
+## Skins, moods and outfits
 
-It's a monster. It sleeps, snores little Zs, yawns, stretches and peeks at you. Its eyes follow your pointer. When it works, it dissolves into a particle monster that thinks in branches and types in the air, then snaps back and hops. It wears Diwali lights in October, a winter hat in December and a cricket cap in IPL season. You can make it walk along your taskbar while it naps. None of this is necessary. All of it is on purpose.
+<p align="center"><img src="docs/assets/readme/moods.svg" width="100%" alt="Six moods in five skins: sleep, listen, think, act, speak, done"></p>
+
+<img src="docs/assets/readme/icons/palette.svg" width="36" align="left">&nbsp;**Five skins:** classic, mint, sunset, midnight and bubblegum. Pick one in the settings panel, under Look.<br clear="left">
+
+<img src="docs/assets/readme/icons/mood.svg" width="36" align="left">&nbsp;**Moods you can read at a glance:** it sleeps and snores little Zs, perks up when it hears you, thinks with bouncing dots, carries a page while it works, talks, and hops when it's done.<br clear="left">
+
+It yawns, stretches and peeks at you. Its eyes follow your pointer. When it works, it dissolves into a particle monster that thinks in branches, then snaps back and hops. It wears Diwali lights in October, a winter hat in December and a cricket cap in IPL season, and you can make it walk along your taskbar while it naps. None of this is necessary. All of it is on purpose.
 
 ## The website
 
-[lazymonster.space](https://lazymonster.space) is served by GitHub Pages from `docs/`. Edit `site/index.html`, then build the published page with `python tools/build_site.py` (it packs the page into a small JavaScript loader and keeps the title and social-preview tags as plain HTML).
+[lazymonster.space](https://lazymonster.space) is served by GitHub Pages from `docs/`. Edit `site/index.html`, then build the published page with `python tools/build_site.py`. The animated README art is generated by `python tools/make_readme_art.py` (it packs the page into a small JavaScript loader and keeps the title and social-preview tags as plain HTML).
 
 ## Contributing
 
