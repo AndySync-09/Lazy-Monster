@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.7.5: Apple Silicon, next door
+- **Mac install on the site and in the README:** the Apple Silicon edition lives on the `apple` branch; main stays the Windows / Intel AI PC edition.
+
 ## 1.7.4
 - **Fix: it stopped hearing you (1.7.3).** The own-voice filter judged every half-finished line: after "Hi Andy, what can I do for you?", the first words of your reply ("hey monster can you…") matched its own words and the whole request was thrown away. Now only a finished line can be dropped, and only when it's at least three meaningful words, nearly all of them just said by the monster; everyday words ("can", "you", "what", "yes") never count.
 

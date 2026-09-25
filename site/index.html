@@ -662,7 +662,7 @@ footer{background:var(--ink);color:#D9D7EA;padding-block:64px 40px;position:rela
     </div>
     <div class="cmds">
       <div class="cmdrow"><div class="top"><strong id="osLabel">Windows: paste into PowerShell</strong><button class="copy" type="button">Copy</button></div>
-        <div class="os-tabs" role="tablist"><button type="button" role="tab" aria-selected="true" data-os="win">Windows</button><button type="button" role="tab" aria-selected="false" data-os="mac">macOS: next week</button></div>
+        <div class="os-tabs" role="tablist"><button type="button" role="tab" aria-selected="true" data-os="win">Windows</button><button type="button" role="tab" aria-selected="false" data-os="mac">Apple Silicon Mac</button></div>
         <code id="installCmd">irm https://raw.githubusercontent.com/AndySync-09/lazy-monster/main/install.ps1 | iex</code></div>
       <div class="cmdrow" style="box-shadow:6px 6px 0 var(--lime)"><div class="top"><strong>What it does, in about 5 minutes</strong></div>
         <ol style="margin:0;padding-left:20px;display:flex;flex-direction:column;gap:6px;color:var(--body)">
@@ -674,8 +674,11 @@ footer{background:var(--ink);color:#D9D7EA;padding-block:64px 40px;position:rela
           <li>Starts it at sign-in and adds it to the Start menu</li>
         </ol>
       </div>
+      <div class="cmdrow" style="box-shadow:6px 6px 0 var(--pink)"><div class="top"><strong>Also on Apple Silicon</strong><span class="small" style="color:var(--body)">M1 to M4 · macOS 13+ · preview</span></div>
+        <p style="color:var(--body);margin:0 0 10px">The same monster for Macs: Whisper and the quick brain on the Apple GPU with MLX, screen reading with Apple's Vision framework on the Neural Engine. It lives on the <a href="https://github.com/AndySync-09/Lazy-Monster/tree/apple" style="text-decoration:underline">apple branch</a>. Paste into Terminal:</p>
+        <code>curl -fsSL https://raw.githubusercontent.com/AndySync-09/Lazy-Monster/apple/install.sh | bash</code></div>
       <details class="cmdrow" style="box-shadow:6px 6px 0 var(--sky)"><summary style="cursor:pointer;font-family:var(--display);font-weight:700;font-size:18px">Prefer to read the script first?</summary>
-        <p style="color:var(--body);margin-top:8px">Good habit. Open <a href="https://github.com/AndySync-09/lazy-monster/blob/main/install.ps1" style="text-decoration:underline">install.ps1 on GitHub</a>, or download it and run it yourself. To remove everything later, run <b>uninstall.ps1</b> from the install folder.</p>
+        <p style="color:var(--body);margin-top:8px">Good habit. Windows: <a href="https://github.com/AndySync-09/lazy-monster/blob/main/install.ps1" style="text-decoration:underline">install.ps1</a>. Mac: <a href="https://github.com/AndySync-09/Lazy-Monster/blob/apple/install.sh" style="text-decoration:underline">install.sh on the apple branch</a>. Or open <a href="https://github.com/AndySync-09/lazy-monster/blob/main/install.ps1" style="text-decoration:underline">install.ps1 on GitHub</a>, or download it and run it yourself. To remove everything later, run <b>uninstall.ps1</b> from the install folder.</p>
       </details>
     </div>
   </section>
@@ -710,7 +713,7 @@ footer{background:var(--ink);color:#D9D7EA;padding-block:64px 40px;position:rela
       <details><summary>Can it remind me?</summary><p>Yes. "Remind me about the cafe meeting at 8 AM" and at 8 the monster wakes up on its own, tells you, and suggests what it could do next, like opening the project or drafting an email. It always asks first.</p></details>
       <details><summary>How do I update or remove it?</summary><p>Run the install command again, or say "monster update" in a terminal. To remove it, run uninstall.ps1 from %LOCALAPPDATA%\LazyMonster\app. It asks before deleting your voice and settings.</p></details>
       <details><summary>Do I need an NPU?</summary><p>No. With an Intel AI PC the wake word runs on the NPU and saves battery. Without one, it runs on the CPU.</p></details>
-      <details><summary>Does it work on a Mac?</summary><p>Next week, for Apple Silicon and Intel Macs. Watch the GitHub repo for releases and you'll hear the moment it lands.</p></details>
+      <details><summary>Does it work on a Mac?</summary><p>Yes, on Apple Silicon (M1 to M4), as a preview. It lives on the apple branch: Whisper and the quick brain run on the Apple GPU with MLX, and screen reading uses Apple's Vision framework. Install it with the Apple Silicon tab above.</p></details>
       <details><summary>Can it delete my files?</summary><p>No. There is no delete, no terminal, no sending and no buying. It writes new files in its own folder and asks before anything risky.</p></details>
       <details><summary>What if someone else says "Hey Monster"?</summary><p>With the voice lock on, it ignores voices that aren't yours. Typed requests and push-to-talk always work for you.</p></details>
     </div>
@@ -1060,11 +1063,11 @@ footer{background:var(--ink);color:#D9D7EA;padding-block:64px 40px;position:rela
 
   /* ---------- install command per OS ---------- */
   var CMDS = { win: ['Windows: paste into PowerShell', 'irm https://raw.githubusercontent.com/AndySync-09/lazy-monster/main/install.ps1 | iex'],
-               mac: ['macOS arrives next week', 'Mac version in final testing. Watch the GitHub repo (Watch > Custom > Releases) to hear the moment it ships.'] };
+               mac: ['Apple Silicon Mac: paste into Terminal', 'curl -fsSL https://raw.githubusercontent.com/AndySync-09/Lazy-Monster/apple/install.sh | bash'] };
   function showOS(os) {
     document.getElementById('osLabel').textContent = CMDS[os][0];
     document.getElementById('installCmd').textContent = CMDS[os][1];
-    var cp = document.querySelector('#install .cmdrow .copy'); if (cp) cp.style.visibility = os === 'mac' ? 'hidden' : 'visible';
+    var cp = document.querySelector('#install .cmdrow .copy'); if (cp) cp.style.visibility = 'visible';
     document.querySelectorAll('.os-tabs button').forEach(function (b) { b.setAttribute('aria-selected', b.dataset.os === os); });
   }
   document.querySelectorAll('.os-tabs button').forEach(function (b) { b.addEventListener('click', function () { showOS(b.dataset.os); }); });

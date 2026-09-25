@@ -129,6 +129,14 @@ It asks for a brain (OpenAI, Claude or a local model) and checks it, installs in
 
 Update by running the same command. Remove with `uninstall.ps1` in `%LOCALAPPDATA%\LazyMonster\app`.
 
+### On a Mac with Apple Silicon
+
+The Mac edition lives on the [`apple`](https://github.com/AndySync-09/Lazy-Monster/tree/apple) branch (preview): Whisper and the quick brain on the Apple GPU with MLX, screen reading with Apple's Vision framework. One command in Terminal:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/AndySync-09/Lazy-Monster/apple/install.sh | bash
+```
+
 ## It won't
 
 <img src="docs/assets/readme/icons/shield.svg" width="44" align="right">
