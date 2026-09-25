@@ -106,13 +106,21 @@ find_python() {
 }
 BASE="$(find_python || true)"
 if [ -z "$BASE" ]; then
-  if command -v brew >/dev/null 2>&1; then
-    note "Installing Python 3.12 with Homebrew..."
-    brew install python@3.12 >/dev/null
-    BASE="$(brew --prefix)/bin/python3.12"
-  else
-    die "Python 3.11+ is needed. Install it from https://www.python.org/downloads/macos/ (or Homebrew), then run this again."
+  UV="$(command -v uv || true)"
+  [ -n "$UV" ] || { [ -x "$HOME/.local/bin/uv" ] && UV="$HOME/.local/bin/uv"; } || true
+  if [ -z "$UV" ]; then
+    note "No Python 3.11+ found. Getting uv to install one just for Lazy-Monster (no admin, no Homebrew)..."
+    curl -LsSf https://astral.sh/uv/install.sh | env UV_NO_MODIFY_PATH=1 sh >/dev/null 2>&1 \
+      || die "Couldn't download uv. Check the internet connection and run this again."
+    UV="$HOME/.local/bin/uv"
+    [ -x "$UV" ] || UV="$HOME/.cargo/bin/uv"
+    [ -x "$UV" ] || die "uv didn't install. Install Python 3.12 from https://www.python.org/downloads/macos/ and run this again."
   fi
+  note "Installing Python 3.12 (about 40 MB, one time)..."
+  "$UV" python install 3.12 >/dev/null 2>&1 \
+    || die "Couldn't install Python with uv. Install Python 3.12 from https://www.python.org/downloads/macos/ and run this again."
+  BASE="$("$UV" python find 3.12 2>/dev/null || true)"
+  [ -n "$BASE" ] && [ -x "$BASE" ] || die "Python was installed but couldn't be found. Run this again."
 fi
 note "Using $BASE ($(uname -m))"
 

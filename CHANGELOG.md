@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.7.4+apple.2: the Mac installer installs Python itself
+- **No Python, no problem:** if the Mac has no Python 3.11+, the installer fetches uv and installs a private Python 3.12 in your home folder. No admin password, no Homebrew, nothing else on the system changes.
+- Keys you entered on an earlier attempt stay in the Keychain, so a rerun goes straight to "Keep it".
+
 ## 1.7.4+apple.1: Apple Silicon edition (apple branch)
 - **The apple branch:** Lazy-Monster for Macs with M-series chips, kept separate from main (the Windows / Intel AI PC edition).
 - **Quick brain on MLX:** Qwen2.5 1.5B (4-bit) on the Mac's GPU; `monster bench-brain --device MLX` picks and checks it.
