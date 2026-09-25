@@ -1135,20 +1135,17 @@ def cmd_update(a, cfg):
 
 
 def cmd_permissions(a, cfg):
-    """macOS: open the three privacy panes Lazy-Monster needs."""
+    """macOS: ask for each permission the official way and wait for the yes."""
     if sys.platform != "darwin":
         print("Only needed on macOS."); return 0
-    import subprocess
-    panes = [("Microphone", "Privacy_Microphone", "so it can hear you"),
-             ("Accessibility", "Privacy_Accessibility", "so it can click and type for you"),
-             ("Automation", "Privacy_Automation", "so it can drive Word, PowerPoint and other apps"),
-             ("Input Monitoring", "Privacy_ListenEvent", "for the push-to-talk hotkey")]
-    print("macOS keeps these switches in System Settings > Privacy & Security.")
-    print("Turn Lazy-Monster (it may show as Python or Terminal) on in each pane:")
-    for name, pane, why in panes:
-        input(f"  {name}: {why}. Press Enter to open it…")
-        subprocess.run(["open", f"x-apple.systempreferences:com.apple.preference.security?{pane}"])
-    return 0
+    from . import macperm
+    rc = macperm.relaunch_in_bundle(["permissions"])
+    if rc is not None:
+        return rc
+    if not macperm.in_bundle():
+        print("  Lazy-Monster.app isn't installed yet, so macOS will list this as Python or Terminal.")
+        print("  Run the installer again to get the app: curl -fsSL https://raw.githubusercontent.com/AndySync-09/Lazy-Monster/apple/install.sh | bash")
+    return 1 if macperm.guided() else 0
 
 
 def cmd_models(a, cfg):
@@ -1423,7 +1420,10 @@ def cmd_doctor(a, cfg):
         except Exception as e:
             line(False, "streaming speech (sherpa-onnx)", str(e))
         from .actions import mac
-        line(mac.trusted(), "Accessibility permission (to click and type)", "run: monster permissions")
+        from . import macperm
+        for name, ok in macperm.status().items():
+            if ok is not None:
+                line(bool(ok), f"{name} permission (for Lazy-Monster)", "run: monster permissions")
     else:
         try:
             import moonshine_voice  # noqa

@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>CFBundleName</key><string>Lazy-Monster</string>
+  <key>CFBundleDisplayName</key><string>Lazy-Monster</string>
+  <key>CFBundleIdentifier</key><string>space.lazymonster.app</string>
+  <key>CFBundleExecutable</key><string>Lazy-Monster</string>
+  <key>CFBundleIconFile</key><string>Lazy-Monster</string>
+  <key>CFBundlePackageType</key><string>APPL</string>
+  <key>CFBundleShortVersionString</key><string>1.7</string>
+  <key>CFBundleVersion</key><string>1</string>
+  <key>LSMinimumSystemVersion</key><string>12.0</string>
+  <key>LSUIElement</key><true/>
+  <key>NSHighResolutionCapable</key><true/>
+  <key>NSMicrophoneUsageDescription</key><string>Lazy-Monster listens for "Hey Monster" and your requests. Audio stays on this Mac.</string>
+  <key>NSAppleEventsUsageDescription</key><string>Lazy-Monster drives apps like Word, PowerPoint and Finder when you ask it to.</string>
+  <key>NSScreenCaptureUsageDescription</key><string>Lazy-Monster reads your screen when you ask "what's on my screen?". It is read on this Mac.</string>
+</dict>
+</plist>

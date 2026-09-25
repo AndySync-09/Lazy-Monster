@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.7.4+apple.3: permissions are one yes each
+- **Lazy-Monster.app:** the installer puts a small signed app in ~/Applications. macOS grants permissions to apps, so every prompt and every switch now says "Lazy-Monster" (not Python or Terminal), and they stay on across updates.
+- **`monster permissions` asks instead of sending you hunting:** each permission is requested the official way, so the macOS dialog pops up or Lazy-Monster is already in the list with its switch ready. It waits and ticks each one off: Microphone, Accessibility, Screen Recording (new, for reading your screen), Input Monitoring and Automation.
+- `monster doctor` shows all five. The background copy starts through the app, so it gets the same permissions.
+
 ## 1.7.4+apple.2: the Mac installer installs Python itself
 - **No Python, no problem:** if the Mac has no Python 3.11+, the installer fetches uv and installs a private Python 3.12 in your home folder. No admin password, no Homebrew, nothing else on the system changes.
 - Keys you entered on an earlier attempt stay in the Keychain, so a rerun goes straight to "Keep it".

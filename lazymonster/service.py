@@ -146,7 +146,10 @@ def _install_mac() -> str:
     config_dir().mkdir(parents=True, exist_ok=True)
     p = _plist_path()
     p.parent.mkdir(parents=True, exist_ok=True)
-    plist = {"Label": PLIST_LABEL, "ProgramArguments": [sys.executable, "-m", "lazymonster.cli", "ui", "--background"],
+    app_exe = Path.home() / "Applications" / "Lazy-Monster.app" / "Contents" / "MacOS" / "Lazy-Monster"
+    # through Lazy-Monster.app, so the permissions you granted to "Lazy-Monster" apply to the background copy
+    prog = [str(app_exe), "ui", "--background"] if app_exe.exists() else [sys.executable, "-m", "lazymonster.cli", "ui", "--background"]
+    plist = {"Label": PLIST_LABEL, "ProgramArguments": prog, "LimitLoadToSessionType": "Aqua",
              "RunAtLoad": True, "KeepAlive": False, "ProcessType": "Interactive",
              "StandardOutPath": str(config_dir() / "launchd.log"), "StandardErrorPath": str(config_dir() / "launchd.log")}
     with open(p, "wb") as f:

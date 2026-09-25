@@ -6,3 +6,5 @@
 *.onnx binary
 *.npz binary
 *.mp4 binary
+*.icns binary
+macos/Lazy-Monster-* binary

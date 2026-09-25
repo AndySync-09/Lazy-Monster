@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "lazy-monster"
-version = "1.7.4+apple.2"
+version = "1.7.4+apple.3"
 description = "Local-first voice control and voice agent for Windows: streaming STT, semantic endpointing, typed allowlisted tools."
 requires-python = ">=3.11"
 license = { text = "Apache-2.0" }
@@ -41,6 +41,7 @@ dependencies = [
   "mlx-lm; sys_platform == 'darwin' and platform_machine == 'arm64'",
   "pyobjc-framework-Vision; sys_platform == 'darwin'",
   "pyobjc-framework-Quartz; sys_platform == 'darwin'",
+  "pyobjc-framework-AVFoundation; sys_platform == 'darwin'",
 ]
 
 [project.optional-dependencies]

@@ -150,6 +150,27 @@ step 3 "Installing (its own private Python environment)"
 "$PY" -m pip install --upgrade pip --quiet --disable-pip-version-check
 "$PY" -m pip install "$APP" --quiet --disable-pip-version-check
 "$PY" -m pip install --force-reinstall --no-deps "$APP" --quiet --disable-pip-version-check
+# Lazy-Monster.app: macOS gives permissions to apps, so the monster gets its own. Then every prompt and
+# every switch in Privacy & Security says "Lazy-Monster" (not Python or Terminal), and the switches stay
+# on across updates because the app only changes when its launcher does.
+BUNDLE="$HOME/Applications/Lazy-Monster.app"
+ARCH="$( [ "$(uname -m)" = arm64 ] && echo aarch64 || echo x86_64 )"
+NEWB="$(mktemp -d)/Lazy-Monster.app"
+mkdir -p "$NEWB/Contents/MacOS" "$NEWB/Contents/Resources"
+cp "$APP/macos/Info.plist" "$NEWB/Contents/Info.plist"
+cp "$APP/macos/Lazy-Monster-$ARCH" "$NEWB/Contents/MacOS/Lazy-Monster"
+cp "$APP/macos/Lazy-Monster.icns" "$NEWB/Contents/Resources/Lazy-Monster.icns"
+printf '%s\n' "$PY" > "$NEWB/Contents/Resources/python-path"
+chmod +x "$NEWB/Contents/MacOS/Lazy-Monster"
+if [ -d "$BUNDLE" ] && diff -rq -x _CodeSignature "$NEWB" "$BUNDLE" >/dev/null 2>&1; then
+  note "Lazy-Monster.app is up to date (your permissions are kept)"
+else
+  mkdir -p "$HOME/Applications"; rm -rf "$BUNDLE"; cp -R "$NEWB" "$BUNDLE"
+  codesign --force --deep --sign - "$BUNDLE" >/dev/null 2>&1 || note "Couldn't sign Lazy-Monster.app; permissions may show as Python."
+  note "Installed Lazy-Monster.app in ~/Applications"
+fi
+rm -rf "$(dirname "$NEWB")"
+[ -x "$BUNDLE/Contents/MacOS/Lazy-Monster" ] && MONSTER="$BUNDLE/Contents/MacOS/Lazy-Monster"
 mkdir -p "$HOME/.local/bin"
 ln -sf "$MONSTER" "$HOME/.local/bin/monster"
 PROFILE="$HOME/.zprofile"
@@ -168,10 +189,9 @@ note "Brain: $BRAIN ${DECIDER:+(+ Jev)}"
 # 5. Models, permissions and your voice ------------------------------------------------------
 step 5 "Voice models (about 1 GB, one time), permissions and your voice"
 "$MONSTER" models --quiet
-note "macOS will ask for Microphone, Accessibility and Automation access. Say yes; they are what let it help."
 if [ "${LM_SKIP_VOICE:-0}" != "1" ] && [ -r "$TTY" ]; then
-  printf "      Open the privacy settings now? [Y/n] "; read -r A < "$TTY" || A=""
-  case "$A" in [nN]*) note "Later: monster permissions" ;; *) "$MONSTER" permissions < "$TTY" ;; esac
+  printf "      Give Lazy-Monster its permissions now (mic, clicking and typing, screen, shortcut, apps)? [Y/n] "; read -r A < "$TTY" || A=""
+  case "$A" in [nN]*) note "Later: monster permissions" ;; *) "$MONSTER" permissions < "$TTY" || true ;; esac
   printf "      Teach it your voice now? Recommended, about 3 minutes. [Y/n] "; read -r A < "$TTY" || A=""
   case "$A" in
     [nN]*) note "Later: monster wake-train ; monster voice-enroll" ;;

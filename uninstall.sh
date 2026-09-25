@@ -3,6 +3,8 @@
 ROOT="$HOME/.lazymonster"; APP="$ROOT/app"
 [ -x "$APP/.venv/bin/python" ] && "$APP/.venv/bin/python" -m lazymonster.cli service uninstall || true
 rm -f "$HOME/.local/bin/monster"
+rm -rf "$HOME/Applications/Lazy-Monster.app"
+tccutil reset All space.lazymonster.app >/dev/null 2>&1 || true
 rm -rf "$APP"
 printf "Also delete your settings, voiceprint, journal, models and saved key? [y/N] "; read -r A < /dev/tty || A=""
 case "$A" in
