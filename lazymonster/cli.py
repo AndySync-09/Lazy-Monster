@@ -980,6 +980,8 @@ def cmd_bench_brain(a, cfg):
     tui.enable()
     if a.mirror:
         os.environ["HF_ENDPOINT"] = "https://hf-mirror.com"
+    if a.device == "MLX" or (a.device in ("NPU", "all") and nb.is_apple_silicon()):
+        return _bench_brain_mlx(a, nb, tui, save_setting)
     devices = ["NPU", "GPU"] if a.device == "all" else [a.device]
     tui.title(f"Quick brain on {' and '.join(devices)}: {len(nb.TESTS)} everyday requests each")
     best = None
@@ -1037,6 +1039,50 @@ def cmd_bench_brain(a, cfg):
     return 0
 
 
+def _bench_brain_mlx(a, nb, tui, save_setting):
+    """Apple Silicon: the quick-brain benchmark with MLX on the GPU."""
+    if not nb.is_apple_silicon():
+        tui.warn("MLX needs a Mac with Apple Silicon (M1 or later).")
+        return 1
+    tui.title(f"Quick brain on Apple Silicon (MLX): {len(nb.TESTS)} everyday requests each")
+    best = None
+    for repo in ([a.model] if a.model else nb.MLX_CANDIDATES):
+        tui.say(f"{repo} on the Apple GPU")
+        try:
+            qb = nb.MLXQuickBrain(repo)
+        except Exception as e:
+            tui.warn(f"  couldn't load it: {type(e).__name__}: {str(e).splitlines()[0][:120]}")
+            continue
+        right = safe = wrong = 0
+        times = []
+        qb.ask("open notes")
+        for req, want in nb.TESTS:
+            if not nb.looks_simple(req):
+                print(f"   ok      0.0 s  {req[:44]:<44} -> hand_off (skipped: clearly big)")
+                right += want == "hand_off"
+                continue
+            d, secs = qb.ask(req)
+            got = d.get("tool")
+            times.append(secs)
+            mark = "ok  " if got == want else ("safe" if got == "hand_off" else "WRONG")
+            right += got == want
+            safe += got == "hand_off" and got != want
+            wrong += mark == "WRONG"
+            print(f"   {mark:<5} {secs:4.1f} s  {req[:44]:<44} -> {got}")
+        acc = right / len(nb.TESTS)
+        med = sorted(times)[len(times) // 2] if times else 0.0
+        tui.ok(f"  {right} right, {safe} handed off, {wrong} wrong; typical {med:.1f} s; loaded in {qb.load_s:.1f} s")
+        if wrong <= 1 and acc >= 0.7 and (best is None or (round(acc, 2), -med) > (round(best[1], 2), -best[2])):
+            best = (repo, acc, med)
+    if not best:
+        tui.warn("None was reliable enough to act on its own. The main brain keeps doing everything.")
+        return 0
+    save_setting("quick_brain_model", best[0])
+    save_setting("quick_brain_device", "MLX")
+    tui.ok(f"Chosen: {best[0]} on the Apple GPU ({best[1]:.0%} right, {best[2]:.1f} s). Turn it on: monster brain --quick on")
+    return 0
+
+
 def cmd_crashes(a, cfg):
     """The latest crash report the watchdog saved."""
     from .watchdog import crash_dir
@@ -1079,7 +1125,7 @@ def cmd_update(a, cfg):
     if sys.platform == "darwin":
         return subprocess.call(["bash", "-c", f"LM_SKIP_VOICE=1 LM_BRAIN={cfg.planner} "
                                 f"LM_JEV={'y' if cfg.decider == 'jev' else 'n'} bash <(curl -fsSL "
-                                + INSTALL_URL.replace("install.ps1", "install.sh") + ")"])
+                                + "https://raw.githubusercontent.com/AndySync-09/Lazy-Monster/apple/install.sh" + ")"])
     if os.name != "nt":
         print("update: pull the repo instead"); return 1
     print("Updating Lazy-Monster (this window will show the installer)...")
@@ -1515,7 +1561,7 @@ def main(argv=None):
     vl.add_argument("state", choices=["on", "off"])
     sub.add_parser("update", help="update to the newest version (keeps your settings and models)")
     bb = sub.add_parser("bench-brain", help="try small models on the NPU as the quick brain")
-    bb.add_argument("--device", default="NPU", choices=["NPU", "GPU", "CPU", "all"])
+    bb.add_argument("--device", default="NPU", choices=["NPU", "GPU", "CPU", "all", "MLX"])
     bb.add_argument("--model", default="")
     bb.add_argument("--mirror", action="store_true")
     bb.add_argument("--redownload", action="store_true")

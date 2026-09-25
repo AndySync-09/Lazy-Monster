@@ -18,7 +18,25 @@ $m = (Get-Counter '\GPU Adapter Memory(*)\Shared Usage' -ErrorAction SilentlyCon
 """
 
 
+def _mac_gpu() -> Optional[dict]:
+    """Apple Silicon GPU load and memory, from ioreg (no admin rights needed)."""
+    import re
+    try:
+        out = subprocess.run(["ioreg", "-r", "-d", "1", "-w", "0", "-c", "IOAccelerator"], capture_output=True,
+                             text=True, timeout=5).stdout
+    except Exception:
+        return None
+    util = re.search(r'"Device Utilization %"\s*=\s*(\d+)', out)
+    mem = re.search(r'"In use system memory"\s*=\s*(\d+)', out)
+    if not util:
+        return None
+    return {"gpu3d": float(util.group(1)), "compute": 0.0, "shared_gb": round(int(mem.group(1)) / 1e9, 1) if mem else 0.0}
+
+
 def gpu() -> Optional[dict]:
+    import sys
+    if sys.platform == "darwin":
+        return _mac_gpu()
     if os.name != "nt":
         return None
     try:
@@ -66,7 +84,7 @@ def describe(s: dict) -> str:
              f"Disk {s['disk_free_gb']} GB free."]
     g = s.get("gpu")
     if g:
-        parts.append(f"GPU {g['gpu3d']}% busy (compute {g['compute']}%), shared GPU memory in use {g['shared_gb']} GB.")
+        parts.append(f"GPU {g['gpu3d']}% busy (compute {g['compute']}%), GPU memory in use {g['shared_gb']} GB.")
     if s.get("battery"):
         b = s["battery"]
         parts.append(f"Battery {b['percent']}%{' charging' if b['plugged_in'] else ''}.")

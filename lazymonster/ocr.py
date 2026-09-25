@@ -94,19 +94,56 @@ class ScreenOCR:
 _ocr: Optional[ScreenOCR] = None
 
 
-def get(device: str = "auto") -> Optional[ScreenOCR]:
+class VisionOCR:
+    """macOS: Apple's Vision framework (VNRecognizeTextRequest). Built into the OS, no download,
+    and Apple runs it on the Neural Engine where the Mac has one."""
+
+    def __init__(self, device: str = "auto"):
+        import Vision  # noqa: F401  (pyobjc-framework-Vision)
+        self.device, self.errors = "Apple Vision (Neural Engine)", {}
+
+    def read(self, image) -> List[str]:
+        import io
+        import Quartz
+        import Vision
+        from Foundation import NSData
+        buf = io.BytesIO()
+        (image if hasattr(image, "save") else __import__("PIL.Image", fromlist=["Image"]).fromarray(image)).save(buf, "PNG")
+        raw = buf.getvalue()
+        src = Quartz.CGImageSourceCreateWithData(NSData.dataWithBytes_length_(raw, len(raw)), None)
+        cg = Quartz.CGImageSourceCreateImageAtIndex(src, 0, None)
+        req = Vision.VNRecognizeTextRequest.alloc().init()
+        req.setRecognitionLevel_(Vision.VNRequestTextRecognitionLevelAccurate)
+        req.setUsesLanguageCorrection_(True)
+        handler = Vision.VNImageRequestHandler.alloc().initWithCGImage_options_(cg, None)
+        handler.performRequests_error_([req], None)
+        rows = []
+        for obs in req.results() or []:
+            cand = obs.topCandidates_(1)
+            if cand and float(cand[0].confidence()) >= 0.4:
+                box = obs.boundingBox()
+                rows.append((-round(box.origin.y, 2), box.origin.x, str(cand[0].string())))
+        return [t for _, _, t in sorted(rows)]
+
+    def read_text(self, image) -> str:
+        return "\n".join(self.read(image))
+
+
+def get(device: str = "auto"):
     global _ocr
     if _ocr is None:
+        import sys
         try:
-            _ocr = ScreenOCR(device)
+            _ocr = VisionOCR(device) if sys.platform == "darwin" else ScreenOCR(device)
         except Exception:
             _ocr = None
     return _ocr
 
 
 def bench(image, device: str = "auto") -> dict:
+    import sys
     t0 = time.perf_counter()
-    o = ScreenOCR(device)
+    o = VisionOCR(device) if sys.platform == "darwin" else ScreenOCR(device)
     load = time.perf_counter() - t0
     o.read(image)                                                # warm-up
     t1 = time.perf_counter()

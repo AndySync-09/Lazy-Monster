@@ -73,6 +73,8 @@ def looks_simple(task: str) -> bool:
     return len(task.split()) <= 14 and not _BIG.search(task)
 
 
+MLX_CANDIDATES = ["mlx-community/Qwen2.5-1.5B-Instruct-4bit", "mlx-community/Qwen2.5-3B-Instruct-4bit"]
+
 CANDIDATES = ["llmware/qwen2.5-1.5b-instruct-ov", "OpenVINO/Qwen2.5-1.5B-Instruct-int4-ov",
               "llmware/Qwen2.5-VL-3B-Instruct-ov-int4-npu"]
 
@@ -166,6 +168,33 @@ class QuickBrain:
         return intent, say, secs
 
 
+class MLXQuickBrain:
+    """Apple Silicon: the same quick brain, run with MLX on the Mac's GPU (unified memory)."""
+
+    def __init__(self, repo: str, device: str = "MLX", cache_dir=None):
+        from mlx_lm import load
+        t0 = time.perf_counter()
+        self.model, self.tok = load(repo)
+        self.load_s = time.perf_counter() - t0
+        self.device, self.constrained, self.vlm = "Apple GPU (MLX)", False, False
+
+    def ask(self, request: str) -> Tuple[dict, float]:
+        from mlx_lm import generate
+        t0 = time.perf_counter()
+        prompt = self.tok.apply_chat_template([{"role": "system", "content": SYSTEM}, {"role": "user", "content": request}],
+                                              add_generation_prompt=True, tokenize=False)
+        text = generate(self.model, self.tok, prompt=prompt, max_tokens=96)
+        return normalize(parse(text)), time.perf_counter() - t0
+
+    handle = QuickBrain.handle
+
+
+def is_apple_silicon() -> bool:
+    import platform
+    import sys
+    return sys.platform == "darwin" and platform.machine() == "arm64"
+
+
 def model_path(repo: str) -> Path:
     from .models import models_dir
     return models_dir() / repo.replace("/", "__")
@@ -189,6 +218,12 @@ _quick = None
 def load(cfg) -> Optional[QuickBrain]:
     """The quick brain from settings, or None (off, not downloaded, or the NPU refused it)."""
     global _quick
+    if _quick is None and cfg.quick_brain and cfg.quick_brain_model and cfg.quick_brain_device == "MLX":
+        try:
+            _quick = MLXQuickBrain(cfg.quick_brain_model)          # mlx-lm keeps its own model cache
+        except Exception:
+            _quick = None
+        return _quick
     if _quick is None and cfg.quick_brain and cfg.quick_brain_model:
         p = model_path(cfg.quick_brain_model)
         if p.exists():

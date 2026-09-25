@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "lazy-monster"
-version = "1.7.4"
+version = "1.7.4+apple.1"
 description = "Local-first voice control and voice agent for Windows: streaming STT, semantic endpointing, typed allowlisted tools."
 requires-python = ">=3.11"
 license = { text = "Apache-2.0" }
@@ -15,7 +15,7 @@ dependencies = [
   "psutil",
   "huggingface_hub",
   "kokoro-onnx>=0.6",
-  "rapidocr-onnxruntime>=1.4",
+  "rapidocr-onnxruntime>=1.4; sys_platform != 'darwin'",
   "onnxruntime",
   "sherpa-onnx>=1.12",
   "pywebview>=5.0",
@@ -37,6 +37,10 @@ dependencies = [
   "faster-whisper; sys_platform == 'darwin' and platform_machine == 'x86_64'",
   "pynput; sys_platform == 'darwin'",
   "pyobjc-framework-ApplicationServices; sys_platform == 'darwin'",
+  # Apple Silicon: the quick brain on MLX, screen reading with Apple's Vision framework
+  "mlx-lm; sys_platform == 'darwin' and platform_machine == 'arm64'",
+  "pyobjc-framework-Vision; sys_platform == 'darwin'",
+  "pyobjc-framework-Quartz; sys_platform == 'darwin'",
 ]
 
 [project.optional-dependencies]

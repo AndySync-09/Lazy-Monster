@@ -15,9 +15,9 @@ import time
 from collections import deque
 from typing import Optional
 
-LATE_OUTPUTS = re.compile(r"hdmi|display audio|nvidia high definition|\btv\b|television|bluetooth|soundbar|"
+LATE_OUTPUTS = re.compile(r"hdmi|display audio|studio display|airplay|homepod|nvidia high definition|\btv\b|television|bluetooth|soundbar|"
                           r"avr|receiver|monitor|dell|lg |samsung|sony|bose|jbl", re.I)
-HEADPHONES = re.compile(r"headphone|headset|earbud|airpods|buds", re.I)
+HEADPHONES = re.compile(r"headphone|headset|earbud|airpods|buds|beats", re.I)
 _WORD = re.compile(r"[a-z0-9']+")
 STOP = set("""hey monster a an the i you me my your we it its it's is are was be to of in on at for and or but so
 can could would will do does did what which who how this that these those please yes no ok okay just now then

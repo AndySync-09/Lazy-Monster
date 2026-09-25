@@ -1897,3 +1897,22 @@ def test_your_reply_after_a_greeting_is_heard():
     eng.on_partial(9, "hey monster can you")
     eng.on_complete(9, "hey monster can you open notepad and write a note")
     assert client.seen                                          # the request reached the brain
+
+
+def test_apple_quick_brain_uses_the_same_rules(monkeypatch):
+    import sys, types
+    from lazymonster import npu_brain as nb
+    fake = types.SimpleNamespace(load=lambda repo: ("model", types.SimpleNamespace(apply_chat_template=lambda m, add_generation_prompt, tokenize: "P")),
+                                 generate=lambda model, tok, prompt, max_tokens: '{"tool": "play_music", "args": {}}')
+    monkeypatch.setitem(sys.modules, "mlx_lm", fake)
+    qb = nb.MLXQuickBrain("mlx-community/Qwen2.5-1.5B-Instruct-4bit")
+    intent, say, secs = qb.handle("play some music")
+    assert intent.name == "media_play_pause" and qb.device == "Apple GPU (MLX)"
+
+
+def test_mac_gpu_from_ioreg(monkeypatch):
+    from lazymonster import sysinfo
+    class R:
+        stdout = '"PerformanceStatistics" = {"Device Utilization %"=37,"In use system memory"=4294967296}'
+    monkeypatch.setattr(sysinfo.subprocess, "run", lambda *a, **k: R())
+    assert sysinfo._mac_gpu() == {"gpu3d": 37.0, "compute": 0.0, "shared_gb": 4.3}

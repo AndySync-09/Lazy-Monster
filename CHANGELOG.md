@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.7.4+apple.1: Apple Silicon edition (apple branch)
+- **The apple branch:** Lazy-Monster for Macs with M-series chips, kept separate from main (the Windows / Intel AI PC edition).
+- **Quick brain on MLX:** Qwen2.5 1.5B (4-bit) on the Mac's GPU; `monster bench-brain --device MLX` picks and checks it.
+- **Screen reading with Apple's Vision framework:** built into macOS, nothing to download, on the Neural Engine where the Mac has one.
+- **Mac GPU in "why is my Mac slow?":** load and memory from ioreg, no admin rights.
+- **Installer:** the same brain step as Windows (keep, switch, go big, local models with a tool test), then the quick brain; downloads from the apple branch.
+- **Echo guard knows Mac outputs:** Studio Display, AirPlay and HomePod count as late speakers; AirPods and Beats as headphones.
+
 ## 1.7.4
 - **Fix: it stopped hearing you (1.7.3).** The own-voice filter judged every half-finished line: after "Hi Andy, what can I do for you?", the first words of your reply ("hey monster can you…") matched its own words and the whole request was thrown away. Now only a finished line can be dropped, and only when it's at least three meaningful words, nearly all of them just said by the monster; everyday words ("can", "you", "what", "yes") never count.
 
